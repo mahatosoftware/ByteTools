@@ -1,5 +1,37 @@
+# Gradle files
 .gradle/
 build/
+
+# Local configuration file (SDK path etc)
 local.properties
-app/build/
+
+# Android Studio
 .idea/
+*.iml
+
+# Generated files
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Log files
+*.log
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Keystore files (VERY IMPORTANT)
+*.jks
+*.keystore
+
+# Firebase (if any local config)
+google-services.json
+
+# NDK
+obj/
+
+# Build outputs
+app/build/
