@@ -10,7 +10,14 @@ import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    val themeMode by viewModel.themeMode.collectAsState(initial = "system")
+    val dynamicColor by viewModel.dynamicColor.collectAsState(initial = true)
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("Settings") }) }
     ) { padding ->
@@ -21,17 +28,34 @@ fun SettingsScreen() {
                 .navigationBarsPadding()
                 .padding(16.dp)
         ) {
-            SettingsItem("Dark Mode", "Toggle system/light/dark mode") {
-                // Handle theme change
+            SettingsItem(
+                title = "Dark Mode",
+                subtitle = "Current: ${themeMode.replaceFirstChar { it.uppercase() }}"
+            ) {
+                viewModel.cycleThemeMode(themeMode)
             }
-            SettingsItem("Dynamic Color", "Enable Material You dynamic colors") {
-                // Handle dynamic color
+            SettingsItem(
+                title = "Dynamic Color",
+                subtitle = if (dynamicColor) "Enabled" else "Disabled"
+            ) {
+                viewModel.toggleDynamicColor(!dynamicColor)
             }
             HorizontalDivider()
             SettingsItem("Privacy Policy", "Read our privacy policy") {
-                // Navigate to privacy policy
+                val intent = android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse("https://sites.google.com/view/bytetools")
+                )
+                context.startActivity(intent)
             }
-            SettingsItem("About", "App Version 1.0.0") {}
+            val appVersion = try {
+                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                packageInfo.versionName
+            } catch (e: Exception) {
+                "Unknown"
+            }
+
+            SettingsItem("About", "App Version $appVersion") {}
         }
     }
 }
