@@ -63,6 +63,7 @@ sealed class Screen(val route: String, val title: String) {
 
     // Group 10: PDF Tools
     object PDFDashboard : Screen("pdf_dashboard", "PDF Tools")
+    object PDFScanner : Screen("pdf_scanner", "Document Scanner")
     object PDFViewer : Screen("pdf_viewer", "PDF Viewer")
     object PDFSplitter : Screen("pdf_splitter", "PDF Splitter")
     object PDFMerger : Screen("pdf_merger", "PDF Merger")

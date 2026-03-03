@@ -119,6 +119,7 @@ fun AppNavigation(
 
         // Group 10: PDF Tools
         composable(Screen.PDFDashboard.route) { PDFDashboardScreen(navController) }
+        composable(Screen.PDFScanner.route) { PDFScannerScreen(navController) }
         composable(
             route = Screen.PDFViewer.route + "?uri={uri}",
             arguments = listOf(navArgument("uri") { 

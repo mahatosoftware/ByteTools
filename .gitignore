@@ -35,3 +35,4 @@ obj/
 
 # Build outputs
 app/build/
+app/release/

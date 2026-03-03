@@ -17,8 +17,8 @@ android {
         applicationId = "in.mahato.bytetools"
         minSdk = 24
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.0.9"
+        versionCode = 10
+        versionName = "1.0.10"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -130,6 +130,7 @@ dependencies {
     implementation(libs.play.services.ads)
     implementation(libs.play.services.location)
     implementation(libs.play.services.maps)
+    implementation(libs.play.services.mlkit.document.scanner)
     
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)

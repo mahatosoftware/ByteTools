@@ -34,6 +34,7 @@ import `in`.mahato.bytetools.ui.navigation.Screen
 @Composable
 fun PDFDashboardScreen(navController: NavController) {
     val pdfTools = listOf(
+        PDFToolItem("Doc Scanner", "Scan physical documents", Icons.Default.DocumentScanner, Screen.PDFScanner.route),
         PDFToolItem("PDF Viewer", "Read & browse PDFs", Icons.Default.MenuBook, Screen.PDFViewer.route),
         PDFToolItem("PDF Splitter", "Split pages by range", Icons.Default.CallSplit, Screen.PDFSplitter.route),
         PDFToolItem("PDF Merger", "Combine multiple PDFs", Icons.Default.Merge, Screen.PDFMerger.route),
