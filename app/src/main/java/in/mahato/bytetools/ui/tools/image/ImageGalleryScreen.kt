@@ -2,8 +2,10 @@ package `in`.mahato.bytetools.ui.tools.image
 
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -22,13 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import `in`.mahato.bytetools.ui.navigation.Screen
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-
-data class GalleryImage(val uri: Uri, val name: String, val size: Long, val dateAdded: Long)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +39,9 @@ fun ImageGalleryScreen(navController: NavController) {
     var images by remember { mutableStateOf<List<GalleryImage>>(emptyList()) }
     var isRefreshing by remember { mutableStateOf(false) }
     var totalStorage by remember { mutableLongStateOf(0L) }
+    
+    var selectedUris by remember { mutableStateOf(setOf<Uri>()) }
+    val isSelectionMode by remember { derivedStateOf { selectedUris.isNotEmpty() } }
 
     val loadImages = {
         scope.launch {
@@ -54,21 +57,43 @@ fun ImageGalleryScreen(navController: NavController) {
         loadImages()
     }
 
+    BackHandler(enabled = isSelectionMode) {
+        selectedUris = emptySet()
+    }
+
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Gallery & History", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            if (isSelectionMode) {
+                TopAppBar(
+                    title = { Text("${selectedUris.size} selected") },
+                    navigationIcon = {
+                        IconButton(onClick = { selectedUris = emptySet() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete selected")
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { loadImages() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                )
+            } else {
+                CenterAlignedTopAppBar(
+                    title = { Text("Gallery & History", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { loadImages() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -104,14 +129,20 @@ fun ImageGalleryScreen(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(images) { image ->
-                        GalleryItem(image, 
-                            onDelete = {
-                                // Add delete logic
-                                deleteImage(context, image.uri)
-                                loadImages()
+                        val isSelected = selectedUris.contains(image.uri)
+                        GalleryItem(
+                            image = image,
+                            isSelected = isSelected,
+                            isSelectionMode = isSelectionMode,
+                            onToggleSelection = {
+                                selectedUris = if (isSelected) {
+                                    selectedUris - image.uri
+                                } else {
+                                    selectedUris + image.uri
+                                }
                             },
                             onView = {
-                                // View logic
+                                navController.navigate(Screen.FullScreenImage.route + "?uri=${Uri.encode(image.uri.toString())}")
                             }
                         )
                     }
@@ -119,54 +150,78 @@ fun ImageGalleryScreen(navController: NavController) {
             }
         }
     }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Images") },
+            text = { Text("Are you sure you want to delete ${selectedUris.size} selected images?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            deleteImages(context, selectedUris.toList())
+                            selectedUris = emptySet()
+                            loadImages()
+                        }
+                        showDeleteConfirm = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun GalleryItem(image: GalleryImage, onDelete: () -> Unit, onView: () -> Unit) {
-    var showDialog by remember { mutableStateOf(false) }
-
+fun GalleryItem(
+    image: GalleryImage,
+    isSelected: Boolean,
+    isSelectionMode: Boolean,
+    onToggleSelection: () -> Unit,
+    onView: () -> Unit
+) {
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .background(Color.LightGray, MaterialTheme.shapes.small)
-            .clickable { showDialog = true }
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer 
+                else Color.LightGray, 
+                MaterialTheme.shapes.small
+            )
+            .combinedClickable(
+                onClick = {
+                    if (isSelectionMode) onToggleSelection() else onView()
+                },
+                onLongClick = {
+                    if (!isSelectionMode) onToggleSelection()
+                }
+            )
     ) {
         AsyncImage(
             model = image.uri,
             contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(if (isSelected) 8.dp else 0.dp),
             contentScale = ContentScale.Crop
         )
-    }
-
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text(image.name, fontSize = 14.sp) },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    AsyncImage(
-                        model = image.uri,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        contentScale = ContentScale.Fit
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text("Size: ${formatFileSize(image.size)}", style = MaterialTheme.typography.labelMedium)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { /* TODO: Re-edit */ }) { Text("Re-edit") }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = { onDelete(); showDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)) {
-                        Text("Delete")
-                    }
-                    TextButton(onClick = { showDialog = false }) { Text("Close") }
-                }
-            }
-        )
+        
+        if (isSelectionMode) {
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onToggleSelection() },
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
+        }
     }
 }
 
@@ -181,7 +236,6 @@ private suspend fun fetchProcessedImages(context: android.content.Context): List
         MediaStore.Images.Media.RELATIVE_PATH
     )
     
-    // We filter for images in our app's specific folders
     val selection = "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
     val selectionArgs = arrayOf("%Pictures/ByteTools%")
     val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
@@ -207,14 +261,17 @@ private suspend fun fetchProcessedImages(context: android.content.Context): List
             list.add(GalleryImage(contentUri, name, size, date))
         }
     }
-    
     list
 }
 
-private fun deleteImage(context: android.content.Context, uri: Uri) {
+private suspend fun deleteImages(context: android.content.Context, uris: List<Uri>) = withContext(Dispatchers.IO) {
     try {
-        context.contentResolver.delete(uri, null, null)
-        android.widget.Toast.makeText(context, "Deleted", android.widget.Toast.LENGTH_SHORT).show()
+        uris.forEach { uri ->
+            context.contentResolver.delete(uri, null, null)
+        }
+        withContext(Dispatchers.Main) {
+            android.widget.Toast.makeText(context, "${uris.size} images deleted", android.widget.Toast.LENGTH_SHORT).show()
+        }
     } catch (e: Exception) {
         e.printStackTrace()
     }

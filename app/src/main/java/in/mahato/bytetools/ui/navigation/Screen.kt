@@ -34,6 +34,7 @@ sealed class Screen(val route: String, val title: String) {
     object DistanceArea : Screen("distance_area", "Distance & Area")
     object Speedometer : Screen("speedometer", "Speedometer")
     object GPSSignal : Screen("gps_signal", "GPS Signal")
+    object GPSCamera : Screen("gps_camera", "GPS Camera")
 
     // Group 7: QR & Barcode Tools
     object QRBarcodeDashboard : Screen("qr_barcode_dashboard", "QR & Barcode")
@@ -60,6 +61,7 @@ sealed class Screen(val route: String, val title: String) {
     object ImageMetadata : Screen("image_metadata", "Image Metadata")
     object ImageToPdf : Screen("image_to_pdf", "Image to PDF")
     object ImageGallery : Screen("image_gallery", "Gallery")
+    object FullScreenImage : Screen("full_screen_image", "Image Viewer")
 
     // Group 10: PDF Tools
     object PDFDashboard : Screen("pdf_dashboard", "PDF Tools")

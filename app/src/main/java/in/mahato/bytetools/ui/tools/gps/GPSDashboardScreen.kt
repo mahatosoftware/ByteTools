@@ -25,10 +25,12 @@ import `in`.mahato.bytetools.ui.navigation.Screen
 fun GPSDashboardScreen(navController: NavController) {
     val tools = listOf(
         GPSToolItem("Live Location Tracker", Icons.Default.MyLocation, "Real-time location, Address, Sharing", Screen.LiveLocation.route),
+        GPSToolItem("GPS Camera", Icons.Default.CameraAlt, "Take a picture with location overlay", Screen.GPSCamera.route),
         GPSToolItem("Digital Compass", Icons.Default.Explore, "True/Magnetic North, Degree display", Screen.DigitalCompass.route),
         GPSToolItem("Distance & Area", Icons.Default.SquareFoot, "Measure distance and polygonal area", Screen.DistanceArea.route),
         GPSToolItem("Speedometer", Icons.Default.Speed, "Real-time speed and trip tracking", Screen.Speedometer.route),
-        GPSToolItem("GPS Signal Info", Icons.Default.SettingsInputAntenna, "Satellite status, Signal strength", Screen.GPSSignal.route)
+        GPSToolItem("GPS Signal Info", Icons.Default.SettingsInputAntenna, "Satellite status, Signal strength", Screen.GPSSignal.route),
+         GPSToolItem("GPS Gallery", Icons.Default.PhotoLibrary, "View photos captured with GPS Camera", Screen.ImageGallery.route)
     )
 
     Scaffold(

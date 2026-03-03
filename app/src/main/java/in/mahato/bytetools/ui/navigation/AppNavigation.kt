@@ -32,6 +32,7 @@ import `in`.mahato.bytetools.ui.tools.gps.compass.DigitalCompassScreen
 import `in`.mahato.bytetools.ui.tools.gps.measurement.DistanceAreaScreen
 import `in`.mahato.bytetools.ui.tools.gps.speedometer.SpeedometerScreen
 import `in`.mahato.bytetools.ui.tools.gps.signal.GPSSignalScreen
+import `in`.mahato.bytetools.ui.tools.gps.camera.GPSCameraScreen
 import `in`.mahato.bytetools.ui.tools.qr.QRGeneratorScreen
 import `in`.mahato.bytetools.ui.tools.common.CodeHistoryScreen
 import `in`.mahato.bytetools.ui.tools.barcode.BarcodeScannerScreen
@@ -46,6 +47,7 @@ import `in`.mahato.bytetools.ui.tools.decision.TruthOrDareScreen
 import `in`.mahato.bytetools.ui.tools.qr.*
 import `in`.mahato.bytetools.ui.tools.pdf.*
 import `in`.mahato.bytetools.ui.tools.image.*
+import `in`.mahato.bytetools.ui.tools.image.ImageViewerScreen
 
 @Composable
 fun AppNavigation(
@@ -90,6 +92,7 @@ fun AppNavigation(
         composable(Screen.DistanceArea.route) { DistanceAreaScreen(navController) }
         composable(Screen.Speedometer.route) { SpeedometerScreen(navController) }
         composable(Screen.GPSSignal.route) { GPSSignalScreen(navController) }
+        composable(Screen.GPSCamera.route) { GPSCameraScreen(navController) }
         
         // Group 7: QR Generator
         composable(Screen.QRBarcodeDashboard.route) { QRBarcodeDashboardScreen(navController) }
@@ -116,6 +119,13 @@ fun AppNavigation(
         composable(Screen.ImageMetadata.route) { ImageMetadataScreen(navController) }
         composable(Screen.ImageToPdf.route) { ImageToPdfScreen(navController) }
         composable(Screen.ImageGallery.route) { ImageGalleryScreen(navController) }
+        composable(
+            route = Screen.FullScreenImage.route + "?uri={uri}",
+            arguments = listOf(navArgument("uri") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val uriString = backStackEntry.arguments?.getString("uri")
+            ImageViewerScreen(navController, uriString)
+        }
 
         // Group 10: PDF Tools
         composable(Screen.PDFDashboard.route) { PDFDashboardScreen(navController) }
