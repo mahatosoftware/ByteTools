@@ -40,14 +40,13 @@ fun ToolsScreen(navController: NavController) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
     
-    val categories = listOf("All", "Quick", "Measurement", "Productivity", "GPS", "Health", "QR", "Decision", "Image", "Device")
-
     val allGroups = listOf(
         ToolGroup("Daily Essentials", "Quick daily shortcuts", listOf(
             ToolItem("Flashlight", "Quick light access", Icons.Default.FlashlightOn, Screen.Flashlight.route, "Quick"),
             ToolItem("Magnifier", "Zoom in on small text", Icons.Default.ZoomIn, Screen.Magnifier.route, "Quick"),
             ToolItem("Direct WhatsApp", "Direct message anyone", Icons.Default.Chat, Screen.DirectWhatsApp.route, "Quick"),
-            ToolItem("Age Calculator", "Birth date helper", Icons.Default.Cake, Screen.AgeCalculator.route, "Productivity")
+            ToolItem("Age Calculator", "Birth date helper", Icons.Default.Cake, Screen.AgeCalculator.route, "Productivity"),
+            ToolItem("Date Duration", "Calculate days between dates", Icons.Default.DateRange, Screen.DateDuration.route, "Productivity")
         )),
         ToolGroup("Measurement Tools", "Precise measuring utility", listOf(
             ToolItem("Unit Converter", "Convert anything", Icons.Default.SyncAlt, Screen.UnitConverter.route, "Measurement"),
@@ -62,6 +61,8 @@ fun ToolsScreen(navController: NavController) {
             ToolItem("Device Info", "Detailed hardware info", Icons.Default.Info, Screen.DeviceInfo.route, "Device")
         ))
     )
+
+    val categories = listOf("All") + allGroups.flatMap { it.items.map { item -> item.category } }.distinct()
 
     val filteredGroups = allGroups.map { group ->
         val filteredItems = group.items.filter { item ->
