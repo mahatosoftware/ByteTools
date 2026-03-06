@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.location.Geocoder
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -190,6 +191,26 @@ fun LiveLocationScreen(navController: NavController) {
                         HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f))
 
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            AnimatedVisibility(visible = currentLocation == null) {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Please wait for a GPS lock before attempting to share or book.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            }
+
                             Button(
                                 onClick = {
                                     currentLocation?.let {
@@ -238,6 +259,25 @@ fun LiveLocationScreen(navController: NavController) {
                                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("Share")
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Book a Ride", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilledTonalButton(
+                                    onClick = { currentLocation?.let { shareRideLink(context, "Uber", it.latitude, it.longitude, address) } },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.large
+                                ) {
+                                    Text("🚕 Book with Uber")
+                                }
+                                FilledTonalButton(
+                                    onClick = { currentLocation?.let { shareRideLink(context, "Ola", it.latitude, it.longitude, address) } },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.large
+                                ) {
+                                    Text("🚕 Book with Ola")
                                 }
                             }
                         }
@@ -310,4 +350,28 @@ suspend fun getAddressFromLocation(context: Context, lat: Double, lng: Double): 
             "Error fetching address"
         }
     }
+}
+
+fun shareRideLink(context: Context, appType: String, lat: Double, lng: Double, address: String) {
+    val url = when (appType) {
+        "Uber" -> "https://m.uber.com/ul/?action=setPickup&pickup[latitude]=$lat&pickup[longitude]=$lng"
+        "Ola" -> "https://book.olacabs.com/?lat=$lat&lng=$lng"
+        else -> "https://maps.google.com/?q=$lat,$lng"
+    }
+
+    val message = """
+        Can you book an $appType for me from my current location?
+        
+        Location: $address
+        Maps Link: https://maps.google.com/?q=$lat,$lng
+        
+        Book directly via: $url
+    """.trimIndent()
+
+    val sendIntent: Intent = Intent().apply {
+        action = Intent.ACTION_SEND
+        putExtra(Intent.EXTRA_TEXT, message)
+        type = "text/plain"
+    }
+    context.startActivity(Intent.createChooser(sendIntent, "Share $appType Booking Link"))
 }
