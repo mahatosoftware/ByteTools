@@ -21,37 +21,59 @@ import kotlin.math.abs
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateDurationScreen(navController: NavController) {
-    val startDate = remember { Calendar.getInstance().apply { clearTime(this) } }
-    val endDate = remember { Calendar.getInstance().apply { 
+    val initialStartDate = remember { Calendar.getInstance().apply { clearTime(this) } }
+    val initialEndDate = remember { Calendar.getInstance().apply { 
         clearTime(this)
         add(Calendar.DAY_OF_MONTH, 1) 
     } }
 
-    var startYear by remember { mutableStateOf(startDate.get(Calendar.YEAR)) }
-    var startMonth by remember { mutableStateOf(startDate.get(Calendar.MONTH)) }
-    var startDay by remember { mutableStateOf(startDate.get(Calendar.DAY_OF_MONTH)) }
+    var startYear by remember { mutableStateOf(initialStartDate.get(Calendar.YEAR)) }
+    var startMonth by remember { mutableStateOf(initialStartDate.get(Calendar.MONTH)) }
+    var startDay by remember { mutableStateOf(initialStartDate.get(Calendar.DAY_OF_MONTH)) }
 
-    var endYear by remember { mutableStateOf(endDate.get(Calendar.YEAR)) }
-    var endMonth by remember { mutableStateOf(endDate.get(Calendar.MONTH)) }
-    var endDay by remember { mutableStateOf(endDate.get(Calendar.DAY_OF_MONTH)) }
+    var endYear by remember { mutableStateOf(initialEndDate.get(Calendar.YEAR)) }
+    var endMonth by remember { mutableStateOf(initialEndDate.get(Calendar.MONTH)) }
+    var endDay by remember { mutableStateOf(initialEndDate.get(Calendar.DAY_OF_MONTH)) }
 
-    // Re-evaluate whenever dates change
+    val startDate = remember(startYear, startMonth, startDay) {
+        Calendar.getInstance().apply {
+            clearTime(this)
+            set(startYear, startMonth, startDay)
+        }
+    }
+
+    val endDate = remember(endYear, endMonth, endDay) {
+        Calendar.getInstance().apply {
+            clearTime(this)
+            set(endYear, endMonth, endDay)
+        }
+    }
+
+    // Since startDate and endDate change when state changes, the calculation below will be re-executed 
+    // because remember(startYear, ...) READS the state, causing the whole function to recompose!
     val actualStart = if (startDate.before(endDate)) startDate else endDate
     val actualEnd = if (startDate.before(endDate)) endDate else startDate
 
-    var years = actualEnd.get(Calendar.YEAR) - actualStart.get(Calendar.YEAR)
-    var months = actualEnd.get(Calendar.MONTH) - actualStart.get(Calendar.MONTH)
-    var days = actualEnd.get(Calendar.DAY_OF_MONTH) - actualStart.get(Calendar.DAY_OF_MONTH)
-
-    if (days < 0) {
-        val prevMonth = (actualEnd.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
-        days += prevMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
-        months--
-    }
-    if (months < 0) {
-        months += 12
+    val tempDate = actualStart.clone() as Calendar
+    var years = actualEnd.get(Calendar.YEAR) - tempDate.get(Calendar.YEAR)
+    tempDate.add(Calendar.YEAR, years)
+    if (tempDate.after(actualEnd)) {
         years--
+        tempDate.add(Calendar.YEAR, -1)
     }
+
+    var months = 0
+    while (true) {
+        tempDate.add(Calendar.MONTH, 1)
+        if (tempDate.after(actualEnd)) {
+            tempDate.add(Calendar.MONTH, -1)
+            break
+        }
+        months++
+    }
+
+    val daysMillis = abs(actualEnd.timeInMillis - tempDate.timeInMillis)
+    val days = ((daysMillis + 12L * 60 * 60 * 1000) / (24L * 60 * 60 * 1000)).toInt()
 
     val diffMillis = abs(endDate.timeInMillis - startDate.timeInMillis)
     // Adding half a day (12 hours) prevents DST jump issues where difference could be 23 hours instead of 24
@@ -95,8 +117,6 @@ fun DateDurationScreen(navController: NavController) {
                     startYear = sYear
                     startMonth = sMonth
                     startDay = sDay
-                    startDate.set(sYear, sMonth, sDay)
-                    clearTime(startDate)
                 }, startYear, startMonth, startDay
             )
 
@@ -106,8 +126,6 @@ fun DateDurationScreen(navController: NavController) {
                     endYear = eYear
                     endMonth = eMonth
                     endDay = eDay
-                    endDate.set(eYear, eMonth, eDay)
-                    clearTime(endDate)
                 }, endYear, endMonth, endDay
             )
 
