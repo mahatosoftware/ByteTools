@@ -366,6 +366,8 @@ fun shareRideLink(context: Context, appType: String, lat: Double, lng: Double, a
         Maps Link: https://maps.google.com/?q=$lat,$lng
         
         Book directly via: $url
+        
+        ⚡ Generated using ByteTools – Your all-in-one utility app.
     """.trimIndent()
 
     val sendIntent: Intent = Intent().apply {

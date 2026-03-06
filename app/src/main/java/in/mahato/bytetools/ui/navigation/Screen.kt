@@ -31,6 +31,7 @@ sealed class Screen(val route: String, val title: String) {
     // Group 5: GPS Utilities Pack
     object GPSDashboard : Screen("gps_dashboard", "GPS Utilities")
     object LiveLocation : Screen("live_location", "Live Location")
+    object ParkingLocation : Screen("parking_location", "Parking Location")
     object DigitalCompass : Screen("digital_compass", "Digital Compass")
     object DistanceArea : Screen("distance_area", "Distance & Area")
     object Speedometer : Screen("speedometer", "Speedometer")

@@ -29,6 +29,7 @@ import `in`.mahato.bytetools.ui.tools.age.AgeCalculatorScreen
 import `in`.mahato.bytetools.ui.tools.dateduration.DateDurationScreen
 import `in`.mahato.bytetools.ui.tools.gps.GPSDashboardScreen
 import `in`.mahato.bytetools.ui.tools.gps.location.LiveLocationScreen
+import `in`.mahato.bytetools.ui.tools.gps.location.ParkingLocationScreen
 import `in`.mahato.bytetools.ui.tools.gps.compass.DigitalCompassScreen
 import `in`.mahato.bytetools.ui.tools.gps.measurement.DistanceAreaScreen
 import `in`.mahato.bytetools.ui.tools.gps.speedometer.SpeedometerScreen
@@ -90,6 +91,7 @@ fun AppNavigation(
         // Group 5: GPS Utilities Pack
         composable(Screen.GPSDashboard.route) { GPSDashboardScreen(navController) }
         composable(Screen.LiveLocation.route) { LiveLocationScreen(navController) }
+        composable(Screen.ParkingLocation.route) { ParkingLocationScreen(navController) }
         composable(Screen.DigitalCompass.route) { DigitalCompassScreen(navController) }
         composable(Screen.DistanceArea.route) { DistanceAreaScreen(navController) }
         composable(Screen.Speedometer.route) { SpeedometerScreen(navController) }
