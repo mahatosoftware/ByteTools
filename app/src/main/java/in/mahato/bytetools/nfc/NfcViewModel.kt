@@ -69,19 +69,32 @@ class NfcViewModel @Inject constructor(
                 val techList = tag.techList?.joinToString(", ") { it.substringAfterLast(".") } ?: "Unknown"
                 
                 val metadata = NfcUtils.readTagMetadata(tag)
-                val data = NfcUtils.readNdefMessage(tag) ?: "Failed to read tag records."
+                val emvData = NfcUtils.readEmvCard(tag)
                 
-                val displayString = """
-                    Tag ID (Hex): $serialNumber
-                    
-                    Supported Technologies:
-                    $techList
-                    
-                    $metadata
-                    
-                    NDEF Records:
-                    $data
-                """.trimIndent()
+                val displayString = if (emvData != null) {
+                    """
+                        Tag ID (Hex): $serialNumber
+                        
+                        Supported Technologies:
+                        $techList
+                        
+                        EMV Credit Card:
+                        $emvData
+                    """.trimIndent()
+                } else {
+                    val data = NfcUtils.readNdefMessage(tag) ?: "Failed to read tag records."
+                    """
+                        Tag ID (Hex): $serialNumber
+                        
+                        Supported Technologies:
+                        $techList
+                        
+                        $metadata
+                        
+                        NDEF Records:
+                        $data
+                    """.trimIndent()
+                }
                 
                 _nfcState.value = NfcState.Success(displayString)
             }

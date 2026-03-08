@@ -25,8 +25,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import android.nfc.NfcAdapter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -204,15 +206,21 @@ fun QuickActionRow(navController: NavController, viewModel: HomeViewModel) {
 
 @Composable
 fun CategoryGrid(navController: NavController, viewModel: HomeViewModel) {
-    val categories = listOf(
+    val context = LocalContext.current
+    val hasNfc = remember { NfcAdapter.getDefaultAdapter(context) != null }
+
+    val categories = mutableListOf(
         CategoryItem("GPS Tools", "Location & Speed", Icons.Default.MyLocation, Screen.GPSDashboard.route, Color(0xFFE3F2FD), Color(0xFF2196F3)),
         CategoryItem("Image Tools", "Crop & Convert", Icons.Default.PhotoLibrary, Screen.ImageDashboard.route, Color(0xFFF3E5F5), Color(0xFF9C27B0)),
         CategoryItem("QR & Barcode", "Scan & Generate", Icons.Default.QrCode, Screen.QRBarcodeDashboard.route, Color(0xFFE8F5E9), Color(0xFF4CAF50)),
         CategoryItem("PDF Tools", "View, Merge, Split", Icons.Default.PictureAsPdf, Screen.PDFDashboard.route, Color(0xFFFBE9E7), Color(0xFFFF5722)),
         CategoryItem("Fun Tools", "Games & Decisions", Icons.Default.Nightlife, Screen.DecisionDashboard.route, Color(0xFFFFF3E0), Color(0xFFFF9800)),
-        CategoryItem("Utility", "Math & Converters", Icons.Default.Construction, Screen.Tools.route, Color(0xFFF1F8E9), Color(0xFF8BC34A)),
-        CategoryItem("NFC Tools", "Read & Write Tags", Icons.Default.Nfc, Screen.NFCDashboard.route, Color(0xFFE0F7FA), Color(0xFF00BCD4))
-    )
+        CategoryItem("Utility", "Math & Converters", Icons.Default.Construction, Screen.Tools.route, Color(0xFFF1F8E9), Color(0xFF8BC34A))
+    ).apply {
+        if (hasNfc) {
+            add(CategoryItem("NFC Tools", "Read & Write Tags", Icons.Default.Nfc, Screen.NFCDashboard.route, Color(0xFFE0F7FA), Color(0xFF00BCD4)))
+        }
+    }
 
     Column(modifier = Modifier.padding(horizontal = 20.dp)) {
         for (i in categories.indices step 2) {

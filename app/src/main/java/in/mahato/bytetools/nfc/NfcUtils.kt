@@ -176,4 +176,149 @@ object NfcUtils {
         } catch (_: Exception) {}
         return false
     }
+
+    fun readEmvCard(tag: Tag): String? {
+        val isoDep = android.nfc.tech.IsoDep.get(tag) ?: return null
+        try {
+            isoDep.connect()
+            // Select PPSE (Proximity Payment System Environment)
+            val ppseCommand = byteArrayOf(
+                0x00, 0xA4.toByte(), 0x04, 0x00, 0x0E,
+                '2'.code.toByte(), 'P'.code.toByte(), 'A'.code.toByte(), 'Y'.code.toByte(), '.'.code.toByte(),
+                'S'.code.toByte(), 'Y'.code.toByte(), 'S'.code.toByte(), '.'.code.toByte(),
+                'D'.code.toByte(), 'D'.code.toByte(), 'F'.code.toByte(), '0'.code.toByte(), '1'.code.toByte(),
+                0x00
+            )
+            val ppseResponse = isoDep.transceive(ppseCommand)
+            if (ppseResponse == null || !isSuccess(ppseResponse)) {
+                return null // Not an EMV payment card
+            }
+            
+            val aid = extractAid(ppseResponse) ?: return "Payment Card detected, but no AID found."
+            
+            // Select AID
+            val selectAidCommand = ByteArray(6 + aid.size)
+            selectAidCommand[0] = 0x00
+            selectAidCommand[1] = 0xA4.toByte()
+            selectAidCommand[2] = 0x04
+            selectAidCommand[3] = 0x00
+            selectAidCommand[4] = aid.size.toByte()
+            System.arraycopy(aid, 0, selectAidCommand, 5, aid.size)
+            selectAidCommand[selectAidCommand.size - 1] = 0x00
+            
+            val aidResponse = isoDep.transceive(selectAidCommand)
+            if (aidResponse == null || !isSuccess(aidResponse)) return "Failed to select payment application."
+            
+            // Get Processing Options
+            val gpoCommand = byteArrayOf(0x80.toByte(), 0xA8.toByte(), 0x00, 0x00, 0x02, 0x83.toByte(), 0x00, 0x00)
+            val gpoResponse = isoDep.transceive(gpoCommand)
+            if (gpoResponse == null || !isSuccess(gpoResponse)) return "Payment Card detected, but reading is blocked/encrypted."
+            
+            val afl = extractAfl(gpoResponse) ?: return "Failed to extract Application File Locator."
+            
+            val sb = StringBuilder()
+            // Read records
+            for (i in afl.indices step 4) {
+                if (i + 2 >= afl.size) break
+                val sfi = afl[i].toInt() shr 3
+                val firstRecord = afl[i + 1].toInt()
+                val lastRecord = afl[i + 2].toInt()
+                
+                for (rec in firstRecord..lastRecord) {
+                    val readCommand = byteArrayOf(
+                        0x00, 0xB2.toByte(), rec.toByte(), ((sfi shl 3) or 4).toByte(), 0x00
+                    )
+                    val recResponse = isoDep.transceive(readCommand)
+                    if (recResponse != null && isSuccess(recResponse)) {
+                        val track2 = extractTrack2(recResponse)
+                        if (track2 != null) {
+                            val parts = track2.split(Regex("[D=]"))
+                            if (parts.size >= 2) {
+                                val pan = parts[0]
+                                val expiry = parts[1].take(4)
+                                if (expiry.length == 4) {
+                                    val formattedPan = pan.chunked(4).joinToString(" ")
+                                    sb.append("Card Number:\n$formattedPan\n\n")
+                                    sb.append("Expiry Date: ${expiry.substring(2)}/${expiry.substring(0, 2)}\n")
+                                    return sb.toString()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return "Payment Card detected. Track 2 data is fully encrypted or hidden."
+
+        } catch (e: Exception) {
+            return "EMV Read Error: ${e.message}"
+        } finally {
+            try { isoDep.close() } catch (e: Exception) {}
+        }
+    }
+
+    private fun isSuccess(response: ByteArray): Boolean {
+        if (response.size < 2) return false
+        val sw1 = response[response.size - 2].toInt() and 0xFF
+        val sw2 = response[response.size - 1].toInt() and 0xFF
+        return sw1 == 0x90 && sw2 == 0x00
+    }
+
+    private fun extractAid(data: ByteArray): ByteArray? {
+        for (i in 0 until data.size - 2) {
+            if (data[i] == 0x4F.toByte()) {
+                val len = data[i + 1].toInt() and 0xFF
+                if (i + 2 + len <= data.size) {
+                    val aid = ByteArray(len)
+                    System.arraycopy(data, i + 2, aid, 0, len)
+                    return aid
+                }
+            }
+        }
+        return null
+    }
+
+    private fun extractAfl(data: ByteArray): ByteArray? {
+        if (data.size > 2 && data[0] == 0x80.toByte()) {
+            val len = data[1].toInt() and 0xFF
+            if (2 + len <= data.size) {
+                val afl = ByteArray(len)
+                System.arraycopy(data, 2, afl, 0, len)
+                return afl
+            }
+        } else if (data.size > 2 && data[0] == 0x77.toByte()) {
+            for (i in 0 until data.size - 2) {
+                if (data[i] == 0x94.toByte()) {
+                    val len = data[i + 1].toInt() and 0xFF
+                    if (i + 2 + len <= data.size) {
+                        val afl = ByteArray(len)
+                        System.arraycopy(data, i + 2, afl, 0, len)
+                        return afl
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun extractTrack2(data: ByteArray): String? {
+        for (i in 0 until data.size - 2) {
+            if (data[i] == 0x57.toByte()) {
+                val len = data[i + 1].toInt() and 0xFF
+                if (i + 2 + len <= data.size) {
+                    val track2Bytes = ByteArray(len)
+                    System.arraycopy(data, i + 2, track2Bytes, 0, len)
+                    return bytesToHex(track2Bytes).replace("F", "") // padding out
+                }
+            }
+        }
+        return null
+    }
+
+    private fun bytesToHex(bytes: ByteArray): String {
+        val sb = java.lang.StringBuilder()
+        for (b in bytes) {
+            sb.append(String.format("%02X", b))
+        }
+        return sb.toString()
+    }
 }
