@@ -73,27 +73,39 @@ class NfcViewModel @Inject constructor(
                 
                 val displayString = if (emvData != null) {
                     """
+                        Scanner Type: EMV Payment Card
                         Tag ID (Hex): $serialNumber
                         
                         Supported Technologies:
                         $techList
                         
-                        EMV Credit Card:
                         $emvData
                     """.trimIndent()
                 } else {
                     val data = NfcUtils.readNdefMessage(tag) ?: "Failed to read tag records."
-                    """
-                        Tag ID (Hex): $serialNumber
-                        
-                        Supported Technologies:
-                        $techList
-                        
-                        $metadata
-                        
-                        NDEF Records:
-                        $data
-                    """.trimIndent()
+                    val otherStats = NfcUtils.readOtherCardStats(tag)
+                    
+                    val sb = StringBuilder()
+                    sb.append("Scanner Type: Universal\n")
+                    sb.append("Tag ID (Hex): $serialNumber\n\n")
+                    
+                    sb.append("Supported Technologies:\n$techList\n\n")
+                    
+                    if (otherStats != null) {
+                        sb.append("Card Type Info:\n$otherStats\n")
+                    }
+                    
+                    sb.append("Hardware Metadata:\n$metadata\n\n")
+                    
+                    val ndefLabel = if (data.contains("unformatted") || data.contains("empty") || data.contains("unsupported")) {
+                        "NDEF Status:\n$data"
+                    } else {
+                        "NDEF Records:\n$data"
+                    }
+                    
+                    sb.append(ndefLabel)
+                    
+                    sb.toString()
                 }
                 
                 _nfcState.value = NfcState.Success(displayString)
@@ -133,10 +145,12 @@ class NfcViewModel @Inject constructor(
             }
         }
         
-        // Return to idle after delay
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(3000)
-            _nfcState.value = NfcState.Ready("Ready for next operation.")
+        // Return to idle after delay only for write/format operations
+        if (currentMode != NfcMode.READ && currentMode != NfcMode.CLONE_READ) {
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(3000)
+                _nfcState.value = NfcState.Ready("Ready for next operation.")
+            }
         }
     }
 

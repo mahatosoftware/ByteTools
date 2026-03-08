@@ -196,6 +196,15 @@ object NfcUtils {
             
             val aid = extractAid(ppseResponse) ?: return "Payment Card detected, but no AID found."
             
+            val schemeHex = bytesToHex(aid)
+            val schemeName = when {
+                schemeHex.startsWith("A000000003") -> "Visa"
+                schemeHex.startsWith("A0000000041010") -> "Mastercard"
+                schemeHex.startsWith("A0000000043060") -> "Maestro"
+                schemeHex.startsWith("A000000524") -> "RuPay"
+                else -> "Unknown / Other"
+            }
+            
             // Select AID
             val selectAidCommand = ByteArray(6 + aid.size)
             selectAidCommand[0] = 0x00
@@ -211,43 +220,95 @@ object NfcUtils {
             
             // Get Processing Options
             val gpoCommand = byteArrayOf(0x80.toByte(), 0xA8.toByte(), 0x00, 0x00, 0x02, 0x83.toByte(), 0x00, 0x00)
-            val gpoResponse = isoDep.transceive(gpoCommand)
-            if (gpoResponse == null || !isSuccess(gpoResponse)) return "Payment Card detected, but reading is blocked/encrypted."
-            
-            val afl = extractAfl(gpoResponse) ?: return "Failed to extract Application File Locator."
-            
-            val sb = StringBuilder()
-            // Read records
-            for (i in afl.indices step 4) {
-                if (i + 2 >= afl.size) break
-                val sfi = afl[i].toInt() shr 3
-                val firstRecord = afl[i + 1].toInt()
-                val lastRecord = afl[i + 2].toInt()
+            var gpoResponse = isoDep.transceive(gpoCommand)
+            if (gpoResponse == null || !isSuccess(gpoResponse)) {
+                // Try dynamic PDOL
+                val pdolGpo = constructGpoCommand(aidResponse)
+                if (pdolGpo != null) {
+                    gpoResponse = isoDep.transceive(pdolGpo)
+                }
                 
-                for (rec in firstRecord..lastRecord) {
-                    val readCommand = byteArrayOf(
-                        0x00, 0xB2.toByte(), rec.toByte(), ((sfi shl 3) or 4).toByte(), 0x00
-                    )
-                    val recResponse = isoDep.transceive(readCommand)
-                    if (recResponse != null && isSuccess(recResponse)) {
-                        val track2 = extractTrack2(recResponse)
-                        if (track2 != null) {
-                            val parts = track2.split(Regex("[D=]"))
-                            if (parts.size >= 2) {
-                                val pan = parts[0]
-                                val expiry = parts[1].take(4)
-                                if (expiry.length == 4) {
-                                    val formattedPan = pan.chunked(4).joinToString(" ")
-                                    sb.append("Card Number:\n$formattedPan\n\n")
-                                    sb.append("Expiry Date: ${expiry.substring(2)}/${expiry.substring(0, 2)}\n")
-                                    return sb.toString()
+                if (gpoResponse == null || !isSuccess(gpoResponse)) {
+                    // Static Fallback
+                    val fallbackGpo = byteArrayOf(0x80.toByte(), 0xA8.toByte(), 0x00, 0x00, 0x23, 0x83.toByte(), 0x21) + ByteArray(33) + byteArrayOf(0x00)
+                    gpoResponse = isoDep.transceive(fallbackGpo)
+                    if (gpoResponse == null || !isSuccess(gpoResponse)) {
+                        return "Payment Card detected ($schemeName), but reading is blocked/encrypted."
+                    }
+                }
+            }
+            
+            var cardPan: String? = null
+            var cardExpiry: String? = null
+            var cardName: String? = null
+            
+            // Visa often returns Track 2 directly in GPO response
+            if (gpoResponse != null && isSuccess(gpoResponse)) {
+                val track2 = extractTrack2(gpoResponse)
+                if (track2 != null) {
+                    val parts = track2.split(Regex("[D=]"))
+                    if (parts.size >= 2) {
+                        cardPan = parts[0]
+                        cardExpiry = parts[1].take(4)
+                    }
+                }
+                if (cardName == null) cardName = extractCardholderName(gpoResponse)
+            }
+            
+            val afl = extractAfl(gpoResponse)
+            
+            if (afl != null) {
+                // Read records
+                for (i in afl.indices step 4) {
+                    if (i + 2 >= afl.size) break
+                    val sfi = afl[i].toInt() shr 3
+                    val firstRecord = afl[i + 1].toInt()
+                    val lastRecord = afl[i + 2].toInt()
+                    
+                    for (rec in firstRecord..lastRecord) {
+                        val readCommand = byteArrayOf(
+                            0x00, 0xB2.toByte(), rec.toByte(), ((sfi shl 3) or 4).toByte(), 0x00
+                        )
+                        val recResponse = isoDep.transceive(readCommand)
+                        if (recResponse != null && isSuccess(recResponse)) {
+                            if (cardPan == null) {
+                                val track2 = extractTrack2(recResponse)
+                                if (track2 != null) {
+                                    val parts = track2.split(Regex("[D=]"))
+                                    if (parts.size >= 2) {
+                                        cardPan = parts[0]
+                                        cardExpiry = parts[1].take(4)
+                                    }
                                 }
+                            }
+                            if (cardName == null) {
+                                cardName = extractCardholderName(recResponse)
                             }
                         }
                     }
                 }
             }
-            return "Payment Card detected. Track 2 data is fully encrypted or hidden."
+            
+            
+            if (cardPan != null && cardExpiry != null && cardExpiry!!.length >= 4) {
+                val sb = StringBuilder()
+                sb.append("Card Scheme: ").append(schemeName).append("\n\n")
+                
+                val maskedPan = if (cardPan!!.length >= 12) {
+                    "${cardPan!!.substring(0, 4)} **** **** ${cardPan!!.takeLast(4)}"
+                } else {
+                    cardPan!!
+                }
+                
+                sb.append("Card Number: \n").append(maskedPan).append("\n\n")
+                if (!cardName.isNullOrBlank()) {
+                    sb.append("Cardholder Name: \n").append(cardName).append("\n\n")
+                }
+                sb.append("Expiry Date: ").append(cardExpiry!!.substring(2, 4)).append("/").append(cardExpiry!!.substring(0, 2)).append("\n")
+                return sb.toString()
+            }
+            
+            return "Payment Card detected ($schemeName). Track 2 data is fully encrypted or hidden."
 
         } catch (e: Exception) {
             return "EMV Read Error: ${e.message}"
@@ -314,11 +375,184 @@ object NfcUtils {
         return null
     }
 
+    private fun extractCardholderName(data: ByteArray): String? {
+        // Find Tag 5F 20 (Cardholder Name)
+        for (i in 0 until data.size - 2) {
+            if (data[i] == 0x5F.toByte() && data[i + 1] == 0x20.toByte()) {
+                val len = data[i + 2].toInt() and 0xFF
+                if (i + 3 + len <= data.size) {
+                    val nameBytes = ByteArray(len)
+                    System.arraycopy(data, i + 3, nameBytes, 0, len)
+                    val name = String(nameBytes, Charset.forName("UTF-8")).trim()
+                    val cleaned = name.replace(Regex("[^A-Za-z0-9 /]"), "").trim()
+                    if (cleaned.isNotBlank() && cleaned.replace("/", "").isNotBlank()) return cleaned.replace("/", " ").trim()
+                }
+            }
+        }
+        
+        // Find Tag 9F 0B (Cardholder Name Extended)
+        for (i in 0 until data.size - 2) {
+            if (data[i] == 0x9F.toByte() && data[i + 1] == 0x0B.toByte()) {
+                val len = data[i + 2].toInt() and 0xFF
+                if (i + 3 + len <= data.size) {
+                    val nameBytes = ByteArray(len)
+                    System.arraycopy(data, i + 3, nameBytes, 0, len)
+                    val name = String(nameBytes, Charset.forName("UTF-8")).trim()
+                    val cleaned = name.replace(Regex("[^A-Za-z0-9 /]"), "").trim()
+                    if (cleaned.isNotBlank() && cleaned.replace("/", "").isNotBlank()) return cleaned.replace("/", " ").trim()
+                }
+            }
+        }
+
+        // Find Tag 56 (Track 1 Data) which contains B[PAN]^[NAME]^[EXP]
+        for (i in 0 until data.size - 1) {
+            if (data[i] == 0x56.toByte()) { // Tag 56 is only 1 byte
+                val len = data[i + 1].toInt() and 0xFF
+                // Ensure length makes sense (usually ~30-76 bytes)
+                if (i + 2 + len <= data.size) {
+                    val track1Bytes = ByteArray(len)
+                    System.arraycopy(data, i + 2, track1Bytes, 0, len)
+                    val track1Str = String(track1Bytes, Charset.forName("UTF-8"))
+                    val parts = track1Str.split("^")
+                    if (parts.size >= 2) {
+                        val name = parts[1].trim()
+                        val cleaned = name.replace(Regex("[^A-Za-z0-9 /]"), "").trim()
+                        if (cleaned.isNotBlank() && cleaned.replace("/", "").isNotBlank()) return cleaned.replace("/", " ").trim()
+                    }
+                }
+            }
+        }
+
+        return null
+    }
+
     private fun bytesToHex(bytes: ByteArray): String {
         val sb = java.lang.StringBuilder()
         for (b in bytes) {
             sb.append(String.format("%02X", b))
         }
         return sb.toString()
+    }
+
+    private fun constructGpoCommand(aidResponse: ByteArray): ByteArray? {
+        var pdolStart = -1
+        var pdolLen = 0
+        for (i in 0 until aidResponse.size - 2) {
+            if (aidResponse[i] == 0x9F.toByte() && aidResponse[i + 1] == 0x38.toByte()) {
+                pdolLen = aidResponse[i + 2].toInt() and 0xFF
+                pdolStart = i + 3
+                break
+            }
+        }
+        if (pdolStart == -1) return null
+
+        val pdolValue = java.io.ByteArrayOutputStream()
+        var i = pdolStart
+        val end = pdolStart + pdolLen
+
+        while (i < end && i < aidResponse.size) {
+            val tag1 = aidResponse[i].toInt() and 0xFF
+            var tag2 = 0
+            if ((tag1 and 0x1F) == 0x1F) {
+                if (i + 1 < aidResponse.size) {
+                    tag2 = aidResponse[i + 1].toInt() and 0xFF
+                }
+                i += 2
+            } else {
+                i += 1
+            }
+
+            if (i < aidResponse.size) {
+                val len = aidResponse[i].toInt() and 0xFF
+                if (tag1 == 0x9F && tag2 == 0x66 && len == 4) { // Terminal Transaction Qualifiers (TTQ)
+                    pdolValue.write(byteArrayOf(0x36.toByte(), 0x00, 0x40.toByte(), 0x00))
+                } else if (tag1 == 0x5F && tag2 == 0x2A && len == 2) { // Transaction Currency Code
+                    pdolValue.write(byteArrayOf(0x08, 0x40.toByte())) // USD
+                } else {
+                    pdolValue.write(ByteArray(len)) // Fill with zeros
+                }
+                i += 1
+            } else {
+                break
+            }
+        }
+
+        val pdolBytes = pdolValue.toByteArray()
+        val cdata = ByteArray(pdolBytes.size + 2)
+        cdata[0] = 0x83.toByte()
+        cdata[1] = pdolBytes.size.toByte()
+        System.arraycopy(pdolBytes, 0, cdata, 2, pdolBytes.size)
+
+        val gpo = ByteArray(cdata.size + 6)
+        gpo[0] = 0x80.toByte()
+        gpo[1] = 0xA8.toByte()
+        gpo[2] = 0x00
+        gpo[3] = 0x00
+        gpo[4] = cdata.size.toByte()
+        System.arraycopy(cdata, 0, gpo, 5, cdata.size)
+        gpo[gpo.size - 1] = 0x00
+        return gpo
+    }
+
+    fun readOtherCardStats(tag: Tag): String? {
+        val techList = tag.techList.asList()
+        val sb = java.lang.StringBuilder()
+        
+        var foundType = false
+
+        if (techList.contains(android.nfc.tech.MifareClassic::class.java.name)) {
+            try {
+                val mifare = android.nfc.tech.MifareClassic.get(tag)
+                if (mifare != null) {
+                    val type = when(mifare.type) {
+                        android.nfc.tech.MifareClassic.TYPE_CLASSIC -> "Classic"
+                        android.nfc.tech.MifareClassic.TYPE_PLUS -> "Plus"
+                        android.nfc.tech.MifareClassic.TYPE_PRO -> "Pro"
+                        else -> "Unknown"
+                    }
+                    sb.append("Card Family: Mifare $type\n")
+                    sb.append("Size: ${mifare.size} Bytes\n")
+                    sb.append("Details: Sectors: ${mifare.sectorCount}, Blocks: ${mifare.blockCount}\n")
+                    sb.append("Likely Use Case: Metro/Transit Cards, Access Control, Corporate IDs\n")
+                    foundType = true
+                }
+            } catch (e: Exception) {}
+        }
+        
+        if (!foundType && techList.contains(android.nfc.tech.MifareUltralight::class.java.name)) {
+            try {
+                val mu = android.nfc.tech.MifareUltralight.get(tag)
+                if (mu != null) {
+                    val type = when(mu.type) {
+                        android.nfc.tech.MifareUltralight.TYPE_ULTRALIGHT -> "Ultralight"
+                        android.nfc.tech.MifareUltralight.TYPE_ULTRALIGHT_C -> "Ultralight C"
+                        else -> "Unknown"
+                    }
+                    sb.append("Card Family: Mifare $type\n")
+                    sb.append("Likely Use Case: Disposable Transit Tickets, Event Passes, Hotel Keys\n")
+                    foundType = true
+                }
+            } catch (e: Exception) {}
+        }
+
+        if (!foundType && techList.contains(android.nfc.tech.IsoDep::class.java.name)) {
+             sb.append("Card Family: ISO-DEP / ISO 14443-4\n")
+             sb.append("Likely Use Case: Modern Metro/Transit Cards (e.g. Mifare DESFire), Identity Cards, Passports\n")
+             foundType = true
+        }
+
+        if (!foundType && techList.contains(android.nfc.tech.NfcF::class.java.name)) {
+             sb.append("Card Family: FeliCa (NfcF)\n")
+             sb.append("Likely Use Case: Transport and E-money (Common in Asia/Japan)\n")
+             foundType = true
+        }
+        
+        if (!foundType && techList.contains(android.nfc.tech.NfcV::class.java.name)) {
+             sb.append("Card Family: ISO 15693 (NfcV)\n")
+             sb.append("Likely Use Case: Ski passes, Library Tags, Vicinity Cards\n")
+             foundType = true
+        }
+
+        return if (foundType) sb.toString() else null
     }
 }

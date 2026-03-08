@@ -60,9 +60,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Search */ }) {
-                        Icon(Icons.Default.Search, "Search")
-                    }
+
                     IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
                         Icon(Icons.Default.Settings, "Settings")
                     }
