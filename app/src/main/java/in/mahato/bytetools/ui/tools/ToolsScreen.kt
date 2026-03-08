@@ -42,23 +42,23 @@ fun ToolsScreen(navController: NavController) {
     
     val allGroups = listOf(
         ToolGroup("Daily Essentials", "Quick daily shortcuts", listOf(
-            ToolItem("Flashlight", "Quick light access", Icons.Default.FlashlightOn, Screen.Flashlight.route, "Quick"),
-            ToolItem("Magnifier", "Zoom in on small text", Icons.Default.ZoomIn, Screen.Magnifier.route, "Quick"),
-            ToolItem("Direct WhatsApp", "Direct message anyone", Icons.Default.Chat, Screen.DirectWhatsApp.route, "Quick"),
-            ToolItem("Age Calculator", "Birth date helper", Icons.Default.Cake, Screen.AgeCalculator.route, "Productivity"),
-            ToolItem("Date Duration", "Calculate days between dates", Icons.Default.DateRange, Screen.DateDuration.route, "Productivity")
+            ToolItem("Flashlight", "Quick light access", Icons.Default.FlashlightOn, Screen.Flashlight.route, "Quick", Color(0xFFE3F2FD), Color(0xFF2196F3)),
+            ToolItem("Magnifier", "Zoom in on small text", Icons.Default.ZoomIn, Screen.Magnifier.route, "Quick", Color(0xFFF3E5F5), Color(0xFF9C27B0)),
+            ToolItem("Direct WhatsApp", "Direct message anyone", Icons.Default.Chat, Screen.DirectWhatsApp.route, "Quick", Color(0xFFE8F5E9), Color(0xFF4CAF50)),
+            ToolItem("Age Calculator", "Birth date helper", Icons.Default.Cake, Screen.AgeCalculator.route, "Productivity", Color(0xFFFBE9E7), Color(0xFFFF5722)),
+            ToolItem("Date Duration", "Calculate days between dates", Icons.Default.DateRange, Screen.DateDuration.route, "Productivity", Color(0xFFFFF3E0), Color(0xFFFF9800))
         )),
         ToolGroup("Measurement Tools", "Precise measuring utility", listOf(
-            ToolItem("Unit Converter", "Convert anything", Icons.Default.SyncAlt, Screen.UnitConverter.route, "Measurement"),
-            ToolItem("Sound Meter", "Measure noise levels", Icons.Default.Mic, Screen.SoundMeter.route, "Measurement"),
-            ToolItem("Bubble Level", "Align surfaces perfectly", Icons.Default.AlignHorizontalCenter, Screen.BubbleLevel.route, "Measurement"),
-            ToolItem("Calculator", "Standard math utility", Icons.Default.Calculate, Screen.Calculator.route, "Productivity")
+            ToolItem("Unit Converter", "Convert anything", Icons.Default.SyncAlt, Screen.UnitConverter.route, "Measurement", Color(0xFFF1F8E9), Color(0xFF8BC34A)),
+            ToolItem("Sound Meter", "Measure noise levels", Icons.Default.Mic, Screen.SoundMeter.route, "Measurement", Color(0xFFE0F7FA), Color(0xFF00BCD4)),
+            ToolItem("Bubble Level", "Align surfaces perfectly", Icons.Default.AlignHorizontalCenter, Screen.BubbleLevel.route, "Measurement", Color(0xFFFFEBEE), Color(0xFFF44336)),
+            ToolItem("Calculator", "Standard math utility", Icons.Default.Calculate, Screen.Calculator.route, "Productivity", Color(0xFFE8EAF6), Color(0xFF3F51B5))
         )),
         ToolGroup("Device Information", "View hardware status", listOf(
-            ToolItem("Battery Info", "Current battery state", Icons.Default.BatteryStd, Screen.BatteryInfo.route, "Device"),
-            ToolItem("Storage Analyzer", "Manage storage space", Icons.Default.Storage, Screen.StorageAnalyzer.route, "Device"),
-            ToolItem("RAM Monitor", "Real-time RAM usage", Icons.Default.Memory, Screen.RAMMonitor.route, "Device"),
-            ToolItem("Device Info", "Detailed hardware info", Icons.Default.Info, Screen.DeviceInfo.route, "Device")
+            ToolItem("Battery Info", "Current battery state", Icons.Default.BatteryStd, Screen.BatteryInfo.route, "Device", Color(0xFFFFF8E1), Color(0xFFFFC107)),
+            ToolItem("Storage Analyzer", "Manage storage space", Icons.Default.Storage, Screen.StorageAnalyzer.route, "Device", Color(0xFFECEFF1), Color(0xFF607D8B)),
+            ToolItem("RAM Monitor", "Real-time RAM usage", Icons.Default.Memory, Screen.RAMMonitor.route, "Device", Color(0xFFE3F2FD), Color(0xFF2196F3)),
+            ToolItem("Device Info", "Detailed hardware info", Icons.Default.Info, Screen.DeviceInfo.route, "Device", Color(0xFFF3E5F5), Color(0xFF9C27B0))
         ))
     )
 
@@ -189,7 +189,7 @@ fun ToolsScreen(navController: NavController) {
 }
 
 data class ToolGroup(val name: String, val subtitle: String, val items: List<ToolItem>)
-data class ToolItem(val name: String, val description: String, val icon: ImageVector, val route: String, val category: String)
+data class ToolItem(val name: String, val description: String, val icon: ImageVector, val route: String, val category: String, val bgColor: Color, val accentColor: Color)
 
 @Composable
 fun ToolCard(item: ToolItem, onClick: () -> Unit) {
@@ -219,57 +219,36 @@ fun ToolCard(item: ToolItem, onClick: () -> Unit) {
                 onClick = onClick
             ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = item.bgColor
         )
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-                        )
-                    )
-                )
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.name,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                
-                Column {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
+            Icon(
+                imageVector = item.icon,
+                contentDescription = item.name,
+                modifier = Modifier.size(32.dp),
+                tint = item.accentColor
+            )
+            
+            Column {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    maxLines = 1
+                )
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    maxLines = 1
+                )
             }
         }
     }

@@ -34,16 +34,16 @@ import `in`.mahato.bytetools.ui.navigation.Screen
 @Composable
 fun PDFDashboardScreen(navController: NavController) {
     val pdfTools = listOf(
-        PDFToolItem("Doc Scanner", "Scan physical documents", Icons.Default.DocumentScanner, Screen.PDFScanner.route),
-        PDFToolItem("PDF Viewer", "Read & browse PDFs", Icons.Default.MenuBook, Screen.PDFViewer.route),
-        PDFToolItem("PDF Splitter", "Split pages by range", Icons.Default.CallSplit, Screen.PDFSplitter.route),
-        PDFToolItem("PDF Merger", "Combine multiple PDFs", Icons.Default.Merge, Screen.PDFMerger.route),
-        PDFToolItem("Sign PDF", "Draw & place signatures", Icons.Default.Draw, Screen.PDFSign.route),
-        PDFToolItem("Watermark", "Add or remove text/image", Icons.Default.WaterDrop, Screen.PDFWatermark.route),
-        PDFToolItem("Redact", "Hide area from PDF", Icons.Default.HighlightAlt, Screen.PDFRedact.route),
-        PDFToolItem("OCR PDF", "Extract text from pages", Icons.Default.Scanner, Screen.PDFOCR.route),
-        PDFToolItem("Img to PDF", "Convert images", Icons.Default.PictureAsPdf, Screen.ImageToPdf.route),
-        PDFToolItem("History", "Managed transformed PDFs", Icons.Default.History, Screen.PDFHistory.route)
+        PDFToolItem("Doc Scanner", "Scan physical documents", Icons.Default.DocumentScanner, Screen.PDFScanner.route, Color(0xFFE3F2FD), Color(0xFF2196F3)),
+        PDFToolItem("PDF Viewer", "Read & browse PDFs", Icons.Default.MenuBook, Screen.PDFViewer.route, Color(0xFFF3E5F5), Color(0xFF9C27B0)),
+        PDFToolItem("PDF Splitter", "Split pages by range", Icons.Default.CallSplit, Screen.PDFSplitter.route, Color(0xFFE8F5E9), Color(0xFF4CAF50)),
+        PDFToolItem("PDF Merger", "Combine multiple PDFs", Icons.Default.Merge, Screen.PDFMerger.route, Color(0xFFFBE9E7), Color(0xFFFF5722)),
+        PDFToolItem("Sign PDF", "Draw & place signatures", Icons.Default.Draw, Screen.PDFSign.route, Color(0xFFFFF3E0), Color(0xFFFF9800)),
+        PDFToolItem("Watermark", "Add or remove text/image", Icons.Default.WaterDrop, Screen.PDFWatermark.route, Color(0xFFF1F8E9), Color(0xFF8BC34A)),
+        PDFToolItem("Redact", "Hide area from PDF", Icons.Default.HighlightAlt, Screen.PDFRedact.route, Color(0xFFE0F7FA), Color(0xFF00BCD4)),
+        PDFToolItem("OCR PDF", "Extract text from pages", Icons.Default.Scanner, Screen.PDFOCR.route, Color(0xFFFFEBEE), Color(0xFFF44336)),
+        PDFToolItem("Img to PDF", "Convert images", Icons.Default.PictureAsPdf, Screen.ImageToPdf.route, Color(0xFFE8EAF6), Color(0xFF3F51B5)),
+        PDFToolItem("History", "Managed transformed PDFs", Icons.Default.History, Screen.PDFHistory.route, Color(0xFFFFF8E1), Color(0xFFFFC107))
     )
 
     Scaffold(
@@ -91,7 +91,7 @@ fun PDFDashboardScreen(navController: NavController) {
     }
 }
 
-data class PDFToolItem(val name: String, val description: String, val icon: ImageVector, val route: String)
+data class PDFToolItem(val name: String, val description: String, val icon: ImageVector, val route: String, val bgColor: androidx.compose.ui.graphics.Color, val accentColor: androidx.compose.ui.graphics.Color)
 
 @Composable
 fun PDFToolCard(item: PDFToolItem, onClick: () -> Unit) {
@@ -121,57 +121,36 @@ fun PDFToolCard(item: PDFToolItem, onClick: () -> Unit) {
                 onClick = onClick
             ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = item.bgColor
         )
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-                        )
-                    )
-                )
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.name,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                
-                Column {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
+            Icon(
+                imageVector = item.icon,
+                contentDescription = item.name,
+                modifier = Modifier.size(32.dp),
+                tint = item.accentColor
+            )
+            
+            Column {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = androidx.compose.ui.graphics.Color.Black,
+                    maxLines = 1
+                )
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = androidx.compose.ui.graphics.Color.Gray,
+                    maxLines = 1
+                )
             }
         }
     }

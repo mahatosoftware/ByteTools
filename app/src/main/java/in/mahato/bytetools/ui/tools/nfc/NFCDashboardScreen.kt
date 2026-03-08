@@ -1,4 +1,4 @@
-package `in`.mahato.bytetools.ui.tools.image
+package `in`.mahato.bytetools.ui.tools.nfc
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.LocalIndication
@@ -32,16 +32,19 @@ import `in`.mahato.bytetools.ui.navigation.Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImageToolsDashboardScreen(navController: NavController) {
-    val imageTools = listOf(
-        ImageToolItem("Cropper", "Precise area selection", Icons.Default.Crop, Screen.ImageCropper.route, Color(0xFFE3F2FD), Color(0xFF2196F3)),
-        ImageToolItem("Resizer", "Change dimensions", Icons.Default.PhotoSizeSelectLarge, Screen.ImageResizer.route, Color(0xFFF3E5F5), Color(0xFF9C27B0)),
-        ImageToolItem("Converter", "Batch format switch", Icons.Default.Transform, Screen.ImageConverter.route, Color(0xFFE8F5E9), Color(0xFF4CAF50)),
-        ImageToolItem("Editor", "Filters & adjustments", Icons.Default.Edit, Screen.ImageEditor.route, Color(0xFFFBE9E7), Color(0xFFFF5722)),
-
-        ImageToolItem("Metadata", "View EXIF details", Icons.Default.Info, Screen.ImageMetadata.route, Color(0xFFFFF3E0), Color(0xFFFF9800)),
-        ImageToolItem("To PDF", "Convert images to PDF", Icons.Default.PictureAsPdf, Screen.ImageToPdf.route, Color(0xFFF1F8E9), Color(0xFF8BC34A)),
-        ImageToolItem("Gallery", "Manage saved media", Icons.Default.Collections, Screen.ImageGallery.route, Color(0xFFE0F7FA), Color(0xFF00BCD4))
+fun NFCDashboardScreen(navController: NavController) {
+    val nfcTools = listOf(
+        NFCToolItem("NFC Tag Reader", "Scan & view NFC data", Icons.Default.Nfc, Screen.NFCTagReader.route, Color(0xFFE3F2FD), Color(0xFF2196F3)),
+        NFCToolItem("Write NFC Tag", "Write data to blank tags", Icons.Default.Edit, Screen.NFCWriter.route, Color(0xFFF3E5F5), Color(0xFF9C27B0)),
+        NFCToolItem("Business Card", "Digital business card", Icons.Default.ContactMail, Screen.NFCBusinessCard.route, Color(0xFFE8F5E9), Color(0xFF4CAF50)),
+        NFCToolItem("WiFi NFC Tag", "Share WiFi via NFC", Icons.Default.WifiTethering, Screen.NFCWiFi.route, Color(0xFFFBE9E7), Color(0xFFFF5722)),
+        NFCToolItem("NFC Automation", "Trigger settings", Icons.Default.SmartButton, Screen.NFCAutomation.route, Color(0xFFFFF3E0), Color(0xFFFF9800)),
+        NFCToolItem("Card Reader", "Read basic card info", Icons.Default.CreditCard, Screen.NFCPaymentReader.route, Color(0xFFF1F8E9), Color(0xFF8BC34A)),
+        NFCToolItem("Clone NFC Tag", "Copy tag to another", Icons.Default.ContentCopy, Screen.NFCClone.route, Color(0xFFE0F7FA), Color(0xFF00BCD4)),
+        NFCToolItem("Erase / Format", "Manage & lock tags", Icons.Default.DeleteForever, Screen.NFCFormatter.route, Color(0xFFFFEBEE), Color(0xFFF44336)),
+        NFCToolItem("QR & NFC Share", "Share via QR + NFC", Icons.Default.Share, Screen.NFCQRHybrid.route, Color(0xFFE8EAF6), Color(0xFF3F51B5)),
+        NFCToolItem("Tap Counter", "Count tag scans", Icons.Default.PlusOne, Screen.NFCTapCounter.route, Color(0xFFFFF8E1), Color(0xFFFFC107)),
+        NFCToolItem("Scanner History", "Past scans & logs", Icons.Default.History, Screen.NFCScannerHistory.route, Color(0xFFECEFF1), Color(0xFF607D8B))
     )
 
     Scaffold(
@@ -49,8 +52,8 @@ fun ImageToolsDashboardScreen(navController: NavController) {
             CenterAlignedTopAppBar(
                 title = { 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Image Tools", fontWeight = FontWeight.Bold)
-                        Text("Visual editing suite", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("NFC Tools", fontWeight = FontWeight.Bold)
+                        Text("Connect with physical tags", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
@@ -80,8 +83,8 @@ fun ImageToolsDashboardScreen(navController: NavController) {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(imageTools) { tool ->
-                ImageToolCard(tool) {
+            items(nfcTools) { tool ->
+                NFCToolCard(tool) {
                     navController.navigate(tool.route)
                 }
             }
@@ -89,10 +92,10 @@ fun ImageToolsDashboardScreen(navController: NavController) {
     }
 }
 
-data class ImageToolItem(val name: String, val description: String, val icon: ImageVector, val route: String, val bgColor: androidx.compose.ui.graphics.Color, val accentColor: androidx.compose.ui.graphics.Color)
+data class NFCToolItem(val name: String, val description: String, val icon: ImageVector, val route: String, val bgColor: Color, val accentColor: Color)
 
 @Composable
-fun ImageToolCard(item: ImageToolItem, onClick: () -> Unit) {
+fun NFCToolCard(item: NFCToolItem, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     
@@ -140,13 +143,13 @@ fun ImageToolCard(item: ImageToolItem, onClick: () -> Unit) {
                     text = item.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = androidx.compose.ui.graphics.Color.Black,
+                    color = Color.Black,
                     maxLines = 1
                 )
                 Text(
                     text = item.description,
                     style = MaterialTheme.typography.labelSmall,
-                    color = androidx.compose.ui.graphics.Color.Gray,
+                    color = Color.Gray,
                     maxLines = 1
                 )
             }
@@ -154,3 +157,23 @@ fun ImageToolCard(item: ImageToolItem, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NFCPlaceholderScreen(navController: NavController, title: String) {
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text(title) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            Text("Coming Soon!", style = MaterialTheme.typography.headlineMedium)
+        }
+    }
+}

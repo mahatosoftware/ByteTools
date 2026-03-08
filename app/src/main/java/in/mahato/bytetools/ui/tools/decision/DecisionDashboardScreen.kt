@@ -34,12 +34,12 @@ import `in`.mahato.bytetools.ui.navigation.Screen
 @Composable
 fun DecisionDashboardScreen(navController: NavController) {
     val decisionTools = listOf(
-        DecisionToolItem("Spin Wheel", "Random selection", Icons.Default.Casino, Screen.SpinWheel.route),
-        DecisionToolItem("Dice Roller", "Roll for luck", Icons.Default.FilterFrames, Screen.DiceRoller.route),
-        DecisionToolItem("Coin Flip", "Heads or Tails", Icons.Default.MonetizationOn, Screen.CoinFlip.route),
-        DecisionToolItem("Random No", "Number generator", Icons.Default.Numbers, Screen.RNG.route),
-        DecisionToolItem("Name Picker", "Group choices", Icons.Default.PersonSearch, Screen.NamePicker.route),
-        DecisionToolItem("Truth or Dare", "Party games", Icons.Default.Celebration, Screen.TruthOrDare.route)
+        DecisionToolItem("Spin Wheel", "Random selection", Icons.Default.Casino, Screen.SpinWheel.route, Color(0xFFE3F2FD), Color(0xFF2196F3)),
+        DecisionToolItem("Dice Roller", "Roll for luck", Icons.Default.FilterFrames, Screen.DiceRoller.route, Color(0xFFF3E5F5), Color(0xFF9C27B0)),
+        DecisionToolItem("Coin Flip", "Heads or Tails", Icons.Default.MonetizationOn, Screen.CoinFlip.route, Color(0xFFE8F5E9), Color(0xFF4CAF50)),
+        DecisionToolItem("Random No", "Number generator", Icons.Default.Numbers, Screen.RNG.route, Color(0xFFFBE9E7), Color(0xFFFF5722)),
+        DecisionToolItem("Name Picker", "Group choices", Icons.Default.PersonSearch, Screen.NamePicker.route, Color(0xFFFFF3E0), Color(0xFFFF9800)),
+        DecisionToolItem("Truth or Dare", "Party games", Icons.Default.Celebration, Screen.TruthOrDare.route, Color(0xFFF1F8E9), Color(0xFF8BC34A))
     )
 
     Scaffold(
@@ -87,7 +87,7 @@ fun DecisionDashboardScreen(navController: NavController) {
     }
 }
 
-data class DecisionToolItem(val name: String, val description: String, val icon: ImageVector, val route: String)
+data class DecisionToolItem(val name: String, val description: String, val icon: ImageVector, val route: String, val bgColor: androidx.compose.ui.graphics.Color, val accentColor: androidx.compose.ui.graphics.Color)
 
 @Composable
 fun DecisionToolCard(item: DecisionToolItem, onClick: () -> Unit) {
@@ -117,57 +117,36 @@ fun DecisionToolCard(item: DecisionToolItem, onClick: () -> Unit) {
                 onClick = onClick
             ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = item.bgColor
         )
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-                        )
-                    )
-                )
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.name,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                
-                Column {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
+            Icon(
+                imageVector = item.icon,
+                contentDescription = item.name,
+                modifier = Modifier.size(32.dp),
+                tint = item.accentColor
+            )
+            
+            Column {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = androidx.compose.ui.graphics.Color.Black,
+                    maxLines = 1
+                )
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = androidx.compose.ui.graphics.Color.Gray,
+                    maxLines = 1
+                )
             }
         }
     }

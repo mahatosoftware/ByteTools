@@ -76,4 +76,18 @@ sealed class Screen(val route: String, val title: String) {
     object PDFRedact : Screen("pdf_redact", "Redact PDF")
     object PDFOCR : Screen("pdf_ocr", "OCR PDF")
     object PDFHistory : Screen("pdf_history", "PDF History")
+
+    // Group 11: NFC Tools
+    object NFCDashboard : Screen("nfc_dashboard", "NFC Tools")
+    object NFCTagReader : Screen("nfc_tag_reader", "NFC Tag Reader")
+    object NFCWriter : Screen("nfc_writer", "Write NFC Tag")
+    object NFCBusinessCard : Screen("nfc_business_card", "NFC Business Card")
+    object NFCWiFi : Screen("nfc_wifi", "WiFi NFC Tag")
+    object NFCAutomation : Screen("nfc_automation", "NFC Automation")
+    object NFCPaymentReader : Screen("nfc_payment_reader", "NFC Card Reader")
+    object NFCClone : Screen("nfc_clone", "Clone NFC Tag")
+    object NFCFormatter : Screen("nfc_formatter", "Erase / Format Tag")
+    object NFCQRHybrid : Screen("nfc_qr_hybrid", "QR & NFC Share")
+    object NFCTapCounter : Screen("nfc_tap_counter", "Tap Counter")
+    object NFCScannerHistory : Screen("nfc_scanner_history", "NFC Scanner History")
 }

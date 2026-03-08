@@ -17,9 +17,16 @@ import `in`.mahato.bytetools.ui.navigation.AppNavigation
 import androidx.navigation.compose.rememberNavController
 import `in`.mahato.bytetools.ui.navigation.BottomNavigationBar
 
+import `in`.mahato.bytetools.nfc.NfcManager
+import android.content.Intent
+import javax.inject.Inject
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
+
+    @Inject
+    lateinit var nfcManager: NfcManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,5 +58,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        nfcManager.enableForegroundDispatch(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        nfcManager.disableForegroundDispatch(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        nfcManager.onNewIntent(intent)
     }
 }

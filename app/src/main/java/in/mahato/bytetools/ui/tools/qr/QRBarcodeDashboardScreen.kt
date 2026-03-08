@@ -34,11 +34,11 @@ import `in`.mahato.bytetools.ui.navigation.Screen
 @Composable
 fun QRBarcodeDashboardScreen(navController: NavController) {
     val tools = listOf(
-        QRToolItem("QR Scanner", "Scan any QR code", Icons.Default.QrCodeScanner, Screen.QRScanner.route),
-        QRToolItem("Barcode Scan", "Scan product barcodes", Icons.Default.CenterFocusStrong, Screen.BarcodeScanner.route),
-        QRToolItem("QR Generator", "Create custom QR", Icons.Default.QrCode, Screen.QRGenerator.route),
-        QRToolItem("Barcode Gen", "Create product codes", Icons.Default.AddBox, Screen.BarcodeGenerator.route),
-        QRToolItem("History", "Previous scans", Icons.Default.History, Screen.QRHistory.route)
+        QRToolItem("QR Scanner", "Scan any QR code", Icons.Default.QrCodeScanner, Screen.QRScanner.route, Color(0xFFE3F2FD), Color(0xFF2196F3)),
+        QRToolItem("Barcode Scan", "Scan product barcodes", Icons.Default.CenterFocusStrong, Screen.BarcodeScanner.route, Color(0xFFF3E5F5), Color(0xFF9C27B0)),
+        QRToolItem("QR Generator", "Create custom QR", Icons.Default.QrCode, Screen.QRGenerator.route, Color(0xFFE8F5E9), Color(0xFF4CAF50)),
+        QRToolItem("Barcode Gen", "Create product codes", Icons.Default.AddBox, Screen.BarcodeGenerator.route, Color(0xFFFBE9E7), Color(0xFFFF5722)),
+        QRToolItem("History", "Previous scans", Icons.Default.History, Screen.QRHistory.route, Color(0xFFFFF3E0), Color(0xFFFF9800))
     )
 
     Scaffold(
@@ -86,7 +86,7 @@ fun QRBarcodeDashboardScreen(navController: NavController) {
     }
 }
 
-data class QRToolItem(val name: String, val description: String, val icon: ImageVector, val route: String)
+data class QRToolItem(val name: String, val description: String, val icon: ImageVector, val route: String, val bgColor: androidx.compose.ui.graphics.Color, val accentColor: androidx.compose.ui.graphics.Color)
 
 @Composable
 fun QRToolCard(item: QRToolItem, onClick: () -> Unit) {
@@ -116,57 +116,36 @@ fun QRToolCard(item: QRToolItem, onClick: () -> Unit) {
                 onClick = onClick
             ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = item.bgColor
         )
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-                        )
-                    )
-                )
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.name,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                
-                Column {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
+            Icon(
+                imageVector = item.icon,
+                contentDescription = item.name,
+                modifier = Modifier.size(32.dp),
+                tint = item.accentColor
+            )
+            
+            Column {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = androidx.compose.ui.graphics.Color.Black,
+                    maxLines = 1
+                )
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = androidx.compose.ui.graphics.Color.Gray,
+                    maxLines = 1
+                )
             }
         }
     }

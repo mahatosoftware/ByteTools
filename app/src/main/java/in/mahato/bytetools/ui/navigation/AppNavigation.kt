@@ -50,6 +50,7 @@ import `in`.mahato.bytetools.ui.tools.qr.*
 import `in`.mahato.bytetools.ui.tools.pdf.*
 import `in`.mahato.bytetools.ui.tools.image.*
 import `in`.mahato.bytetools.ui.tools.image.ImageViewerScreen
+import `in`.mahato.bytetools.ui.tools.nfc.*
 
 @Composable
 fun AppNavigation(
@@ -152,5 +153,19 @@ fun AppNavigation(
         composable(Screen.PDFRedact.route) { PDFRedactScreen(navController) }
         composable(Screen.PDFOCR.route) { PDFOCRScreen(navController) }
         composable(Screen.PDFHistory.route) { PDFHistoryScreen(navController) }
+
+        // Group 11: NFC Tools
+        composable(Screen.NFCDashboard.route) { NFCDashboardScreen(navController) }
+        composable(Screen.NFCTagReader.route) { NFCTagReaderScreen(navController) }
+        composable(Screen.NFCWriter.route) { NFCWriterScreen(navController) }
+        composable(Screen.NFCBusinessCard.route) { NFCBusinessCardScreen(navController) }
+        composable(Screen.NFCWiFi.route) { NFCWiFiScreen(navController) }
+        composable(Screen.NFCAutomation.route) { NFCAutomationScreen(navController) }
+        composable(Screen.NFCPaymentReader.route) { NFCPaymentReaderScreen(navController) }
+        composable(Screen.NFCClone.route) { NFCCloneScreen(navController) }
+        composable(Screen.NFCFormatter.route) { NFCFormatterScreen(navController) }
+        composable(Screen.NFCQRHybrid.route) { NFCQRHybridScreen(navController) }
+        composable(Screen.NFCTapCounter.route) { NFCTapCounterScreen(navController) }
+        composable(Screen.NFCScannerHistory.route) { NFCScannerHistoryScreen(navController) }
     }
 }
