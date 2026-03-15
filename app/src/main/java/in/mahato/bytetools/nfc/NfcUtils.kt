@@ -7,6 +7,15 @@ import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import java.nio.charset.Charset
 
+enum class RecordType {
+    TEXT, URI, VCARD, WIFI, APP_LAUNCH, MIME, UNKNOWN, EMPTY
+}
+
+data class ParsedNdefRecord(
+    val type: RecordType,
+    val data: String
+)
+
 object NfcUtils {
 
     fun readTagMetadata(tag: Tag): String {
@@ -26,7 +35,13 @@ object NfcUtils {
             val maxSize = ndef.maxSize
             val isWritable = ndef.isWritable
             
-            return "Type: $type\nSize: $maxSize Bytes\nWritable: $isWritable"
+            val usedSize = try {
+                ndef.ndefMessage?.toByteArray()?.size ?: ndef.cachedNdefMessage?.toByteArray()?.size ?: 0
+            } catch (e: Exception) {
+                ndef.cachedNdefMessage?.toByteArray()?.size ?: 0
+            }
+            
+            return "Type: $type\nSize: $usedSize / $maxSize Bytes\nWritable: $isWritable"
         } catch (e: Exception) {
             return "Error reading metadata: ${e.message}"
         } finally {
@@ -56,6 +71,84 @@ object NfcUtils {
         } finally {
             try { ndef.close() } catch (_: Exception) {}
         }
+    }
+
+    fun getParsedNdefRecords(tag: Tag): List<ParsedNdefRecord> {
+        val ndef = Ndef.get(tag) ?: return emptyList()
+        try {
+            ndef.connect()
+            val ndefMessage = ndef.cachedNdefMessage ?: return emptyList()
+            val records = ndefMessage.records ?: return emptyList()
+            
+            return records.map { parseToRecord(it) }
+        } catch (e: Exception) {
+            return emptyList()
+        } finally {
+            try { ndef.close() } catch (_: Exception) {}
+        }
+    }
+
+    private fun parseToRecord(record: NdefRecord): ParsedNdefRecord {
+        val payload = record.payload
+        if (payload == null || payload.isEmpty()) return ParsedNdefRecord(RecordType.EMPTY, "Empty Record")
+        
+        when (record.tnf) {
+            NdefRecord.TNF_WELL_KNOWN -> {
+                if (record.type.contentEquals(NdefRecord.RTD_TEXT)) {
+                    val languageCodeLength = (payload[0].toInt() and 0x3F)
+                    val text = String(payload, languageCodeLength + 1, payload.size - languageCodeLength - 1, Charset.forName("UTF-8"))
+                    return ParsedNdefRecord(RecordType.TEXT, text)
+                } else if (record.type.contentEquals(NdefRecord.RTD_URI)) {
+                    val uriPrefixes = arrayOf(
+                        "", "http://www.", "https://www.", "http://", "https://", "tel:", "mailto:",
+                        "ftp://anonymous:anonymous@", "ftp://ftp.", "ftps://", "sftp://", "smb://",
+                        "nfs://", "ftp://", "dav://", "news:", "telnet://", "imap:", "rtsp://", "urn:",
+                        "pop:", "sip:", "sips:", "tftp:", "btspp://", "btl2cap://", "btgoep://",
+                        "tcpobex://", "irdaobex://", "file://", "urn:epc:id:", "urn:epc:tag:",
+                        "urn:epc:pat:", "urn:epc:raw:", "urn:epc:", "urn:nfc:"
+                    )
+                    val prefixIndex = payload[0].toInt()
+                    val prefix = if (prefixIndex in uriPrefixes.indices) uriPrefixes[prefixIndex] else ""
+                    val uri = prefix + String(payload, 1, payload.size - 1, Charset.forName("UTF-8"))
+                    return ParsedNdefRecord(RecordType.URI, uri)
+                }
+            }
+            NdefRecord.TNF_MIME_MEDIA -> {
+                val mimeType = String(record.type, Charset.forName("UTF-8"))
+                val content = String(payload, Charset.forName("UTF-8"))
+                when {
+                    mimeType.equals("text/x-vcard", ignoreCase = true) || content.startsWith("BEGIN:VCARD") -> {
+                        return ParsedNdefRecord(RecordType.VCARD, content)
+                    }
+                    mimeType.equals("application/vnd.wfa.wsc", ignoreCase = true) || mimeType.equals("application/x-wifi-config", ignoreCase = true) -> {
+                        return ParsedNdefRecord(RecordType.WIFI, content)
+                    }
+                    else -> {
+                        if (content.startsWith("WIFI:S:")) {
+                            return ParsedNdefRecord(RecordType.WIFI, content)
+                        }
+                        return ParsedNdefRecord(RecordType.MIME, "MIME: $mimeType\n$content")
+                    }
+                }
+            }
+            NdefRecord.TNF_ABSOLUTE_URI -> {
+                 val content = String(payload, Charset.forName("UTF-8"))
+                 return ParsedNdefRecord(RecordType.URI, content)
+            }
+            NdefRecord.TNF_EXTERNAL_TYPE -> {
+                 val typeStr = String(record.type, Charset.forName("UTF-8"))
+                 val content = String(payload, Charset.forName("UTF-8"))
+                 if (typeStr == "android.com:pkg") {
+                     return ParsedNdefRecord(RecordType.APP_LAUNCH, content)
+                 }
+                 return ParsedNdefRecord(RecordType.UNKNOWN, "External: $typeStr\n$content")
+            }
+        }
+        val content = String(payload, Charset.forName("UTF-8"))
+        if (content.startsWith("WIFI:S:")) {
+            return ParsedNdefRecord(RecordType.WIFI, content)
+        }
+        return ParsedNdefRecord(RecordType.UNKNOWN, content)
     }
 
     private fun parseRecord(record: NdefRecord): String {

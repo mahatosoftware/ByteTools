@@ -6,6 +6,8 @@ import android.nfc.Tag
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import `in`.mahato.bytetools.domain.model.ScanResult
+import `in`.mahato.bytetools.domain.repository.ScanRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,11 +17,14 @@ import javax.inject.Inject
 
 @HiltViewModel
 class NfcViewModel @Inject constructor(
-    private val nfcManager: NfcManager
+    private val nfcManager: NfcManager,
+    private val scanRepository: ScanRepository
 ) : ViewModel() {
 
     private val _nfcState = MutableStateFlow<NfcState>(NfcState.Idle)
     val nfcState: StateFlow<NfcState> = _nfcState.asStateFlow()
+    
+    val savedState = MutableStateFlow(false)
 
     private var currentMode: NfcMode = NfcMode.READ
     private var pendingNdefMessage: NdefMessage? = null
@@ -108,7 +113,9 @@ class NfcViewModel @Inject constructor(
                     sb.toString()
                 }
                 
-                _nfcState.value = NfcState.Success(displayString)
+                val parsedRecords = NfcUtils.getParsedNdefRecords(tag)
+                
+                _nfcState.value = NfcState.Success(displayString, parsedRecords)
             }
             NfcMode.WRITE -> {
                 val msg = pendingNdefMessage
@@ -153,9 +160,32 @@ class NfcViewModel @Inject constructor(
             }
         }
     }
+    
+    fun saveNfcScan(data: String) {
+        viewModelScope.launch {
+            // Save the raw text metadata log
+            scanRepository.saveScan(ScanResult(content = data, format = "NFC"))
+            
+            // Save the parsed interactive records if they exist
+            val state = _nfcState.value
+            if (state is NfcState.Success) {
+                state.parsedRecords.forEach { record ->
+                    scanRepository.saveScan(
+                        ScanResult(
+                            content = "${record.type.name}::::${record.data}",
+                            format = "NFC_RECORD"
+                        )
+                    )
+                }
+            }
+            
+            savedState.value = true
+        }
+    }
 
     fun resetState() {
         _nfcState.value = NfcState.Idle
+        savedState.value = false
     }
 }
 
@@ -166,6 +196,6 @@ enum class NfcMode {
 sealed class NfcState {
     object Idle : NfcState()
     data class Ready(val message: String) : NfcState()
-    data class Success(val data: String) : NfcState()
+    data class Success(val data: String, val parsedRecords: List<ParsedNdefRecord> = emptyList()) : NfcState()
     data class Error(val error: String) : NfcState()
 }

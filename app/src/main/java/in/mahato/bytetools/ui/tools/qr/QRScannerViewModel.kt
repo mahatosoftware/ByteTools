@@ -32,4 +32,10 @@ class QRScannerViewModel @Inject constructor(
             repository.saveScan(ScanResult(content = content, format = format))
         }
     }
+    
+    fun deleteScanResult(id: Int) {
+        viewModelScope.launch {
+            repository.deleteScan(id)
+        }
+    }
 }
