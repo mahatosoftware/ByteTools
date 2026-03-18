@@ -4,8 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,12 +38,15 @@ import java.util.*
 fun PDFHistoryScreen(navController: NavController) {
     val context = LocalContext.current
     var pdfFiles by remember { mutableStateOf(listOf<File>()) }
+    var selectedPaths by remember { mutableStateOf(setOf<String>()) }
+    val selectionMode = selectedPaths.isNotEmpty()
 
     fun refreshFiles() {
         val dir = File(context.getExternalFilesDir(null), "ByteToolsPDF")
         if (dir.exists()) {
             pdfFiles = dir.listFiles { file -> file.extension.lowercase() == "pdf" }
                 ?.sortedByDescending { it.lastModified() } ?: emptyList()
+            selectedPaths = selectedPaths.filter { path -> pdfFiles.any { it.absolutePath == path } }.toSet()
         }
     }
 
@@ -53,15 +57,35 @@ fun PDFHistoryScreen(navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("PDF History", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        if (selectionMode) "${selectedPaths.size} selected" else "PDF History",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { refreshFiles() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    if (selectionMode) {
+                        IconButton(
+                            onClick = {
+                                pdfFiles.filter { it.absolutePath in selectedPaths }.forEach { it.delete() }
+                                selectedPaths = emptySet()
+                                refreshFiles()
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Selected")
+                        }
+                        IconButton(onClick = { selectedPaths = emptySet() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear Selection")
+                        }
+                    } else {
+                        IconButton(onClick = { refreshFiles() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
                     }
                 }
             )
@@ -101,13 +125,20 @@ fun PDFHistoryScreen(navController: NavController) {
                     items(pdfFiles, key = { it.absolutePath }) { file ->
                         PDFHistoryItem(
                             file = file,
+                            isSelected = file.absolutePath in selectedPaths,
+                            selectionMode = selectionMode,
                             onView = {
                                 val uriString = Uri.fromFile(file).toString()
-                                // Encode the URI to handle special characters if necessary, 
-                                // though navigation arguments handle strings.
                                 navController.navigate(Screen.PDFViewer.route + "?uri=${Uri.encode(uriString)}")
                             },
                             onShare = { sharePdf(context, file) },
+                            onToggleSelection = {
+                                selectedPaths = if (file.absolutePath in selectedPaths) {
+                                    selectedPaths - file.absolutePath
+                                } else {
+                                    selectedPaths + file.absolutePath
+                                }
+                            },
                             onDelete = {
                                 if (file.delete()) refreshFiles()
                             }
@@ -119,24 +150,52 @@ fun PDFHistoryScreen(navController: NavController) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PDFHistoryItem(file: File, onView: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
+fun PDFHistoryItem(
+    file: File,
+    isSelected: Boolean,
+    selectionMode: Boolean,
+    onView: () -> Unit,
+    onShare: () -> Unit,
+    onToggleSelection: () -> Unit,
+    onDelete: () -> Unit
+) {
     val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
     val dateString = sdf.format(Date(file.lastModified()))
     val sizeKB = file.length() / 1024
     val sizeText = if (sizeKB > 1024) String.format("%.2f MB", sizeKB / 1024f) else "$sizeKB KB"
+    val operation = pdfOperationLabel(file.name)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onView() },
+            .combinedClickable(
+                onClick = {
+                    if (selectionMode) onToggleSelection() else onView()
+                },
+                onLongClick = { onToggleSelection() }
+            ),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            }
+        )
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (selectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelection() }
+                )
+                Spacer(Modifier.width(8.dp))
+            }
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
@@ -158,18 +217,25 @@ fun PDFHistoryItem(file: File, onView: () -> Unit, onShare: () -> Unit, onDelete
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
+                    text = operation,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
                     text = "$dateString • $sizeText",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
-            Row {
-                IconButton(onClick = onShare) {
-                    Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+            if (!selectionMode) {
+                Row {
+                    IconButton(onClick = onShare) {
+                        Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }
@@ -184,4 +250,18 @@ private fun sharePdf(context: Context, file: File) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(intent, "Share PDF"))
+}
+
+private fun pdfOperationLabel(fileName: String): String {
+    val normalized = fileName.lowercase(Locale.getDefault())
+    return when {
+        normalized.startsWith("watermarked_") -> "Watermark"
+        normalized.startsWith("redacted_") -> "Redact"
+        normalized.startsWith("merged_") -> "Merge"
+        normalized.startsWith("signed_") -> "Sign"
+        normalized.startsWith("scanned_document_") -> "Document Scan"
+        normalized.startsWith("split_") || normalized.startsWith("page_") -> "Split"
+        normalized.startsWith("bytetools_") -> "Image to PDF"
+        else -> "PDF Output"
+    }
 }

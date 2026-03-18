@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.IOException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +41,7 @@ fun ImageToPdfScreen(navController: NavController) {
     var selectedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var isProcessing by remember { mutableStateOf(false) }
     var pdfFile by remember { mutableStateOf<File?>(null) }
+    var savedPdfFile by remember { mutableStateOf<File?>(null) }
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -60,7 +62,7 @@ fun ImageToPdfScreen(navController: NavController) {
                 },
                 actions = {
                     if (selectedImages.isNotEmpty()) {
-                        IconButton(onClick = { selectedImages = emptyList(); pdfFile = null }) {
+                        IconButton(onClick = { selectedImages = emptyList(); pdfFile = null; savedPdfFile = null }) {
                             Icon(Icons.Default.DeleteSweep, contentDescription = "Clear All")
                         }
                     }
@@ -75,6 +77,7 @@ fun ImageToPdfScreen(navController: NavController) {
                             isProcessing = true
                             val file = createPdfFromImages(context, selectedImages)
                             pdfFile = file
+                            savedPdfFile = null
                             isProcessing = false
                             if (file != null) {
                                 android.widget.Toast.makeText(context, "PDF Created: ${file.name}", android.widget.Toast.LENGTH_LONG).show()
@@ -156,10 +159,35 @@ fun ImageToPdfScreen(navController: NavController) {
                                     Spacer(Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text("PDF Ready", fontWeight = FontWeight.Bold)
-                                        Text(pdfFile!!.name, style = MaterialTheme.typography.bodySmall)
+                                        Text((savedPdfFile ?: pdfFile!!).name, style = MaterialTheme.typography.bodySmall)
                                     }
-                                    Button(onClick = { shareFile(context, pdfFile!!) }) {
-                                        Text("Share")
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        if (savedPdfFile == null) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    val savedFile = savePdfToHistory(context, pdfFile!!)
+                                                    if (savedFile != null) {
+                                                        savedPdfFile = savedFile
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "PDF saved to history",
+                                                            android.widget.Toast.LENGTH_LONG
+                                                        ).show()
+                                                    } else {
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "Could not save PDF",
+                                                            android.widget.Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                }
+                                            ) {
+                                                Text("Save")
+                                            }
+                                        }
+                                        Button(onClick = { shareFile(context, savedPdfFile ?: pdfFile!!) }) {
+                                            Text("Share")
+                                        }
                                     }
                                 }
                             }
@@ -271,4 +299,15 @@ private fun shareFile(context: android.content.Context, file: File) {
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(android.content.Intent.createChooser(intent, "Share PDF"))
+}
+
+private fun savePdfToHistory(context: android.content.Context, sourceFile: File): File? {
+    return try {
+        val historyDir = File(context.getExternalFilesDir(null), "ByteToolsPDF").apply { mkdirs() }
+        val targetFile = File(historyDir, sourceFile.name)
+        sourceFile.copyTo(targetFile, overwrite = true)
+        targetFile
+    } catch (_: IOException) {
+        null
+    }
 }

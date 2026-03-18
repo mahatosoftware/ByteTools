@@ -12,7 +12,7 @@ import `in`.mahato.bytetools.domain.model.WeightRecord
 import `in`.mahato.bytetools.domain.model.WeightGoal
 import `in`.mahato.bytetools.domain.model.UserHealthProfile
 
-@Database(entities = [ScanResult::class, CalcResult::class, BloodPressureRecord::class, BloodSugarRecord::class, QRRecord::class, WheelOption::class, WeightRecord::class, WeightGoal::class, UserHealthProfile::class], version = 8, exportSchema = false)
+@Database(entities = [ScanResult::class, CalcResult::class, BloodPressureRecord::class, BloodSugarRecord::class, QRRecord::class, WheelOption::class, WeightRecord::class, WeightGoal::class, UserHealthProfile::class], version = 9, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun scanDao(): ScanDao
     abstract fun calcDao(): CalcDao

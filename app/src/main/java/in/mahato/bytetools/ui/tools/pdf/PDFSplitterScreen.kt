@@ -1,5 +1,6 @@
 package `in`.mahato.bytetools.ui.tools.pdf
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,12 +34,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.navigation.NavController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import `in`.mahato.bytetools.ui.navigation.Screen
 import java.io.File
 import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 enum class SplitMode {
     Manual, EveryPage, Range
@@ -48,18 +54,27 @@ enum class SplitMode {
 fun PDFSplitterScreen(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var pdfUri by remember { mutableStateOf<Uri?>(null) }
-    var pageCount by remember { mutableIntStateOf(0) }
-    val selectedPages = remember { mutableStateListOf<Int>() }
+    var pdfUriString by rememberSaveable { mutableStateOf<String?>(null) }
+    var pageCount by rememberSaveable { mutableIntStateOf(0) }
+    var selectedPages by rememberSaveable { mutableStateOf<List<Int>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     val thumbnails = remember { mutableStateListOf<Bitmap>() }
-    var splitMode by remember { mutableStateOf(SplitMode.Manual) }
-    var rangeText by remember { mutableStateOf("") }
+    var splitModeOrdinal by rememberSaveable { mutableIntStateOf(SplitMode.Manual.ordinal) }
+    var rangeText by rememberSaveable { mutableStateOf("") }
+    var generatedPaths by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var savedPaths by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+
+    val pdfUri = pdfUriString?.let(Uri::parse)
+    val splitMode = SplitMode.entries[splitModeOrdinal]
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri ->
-            pdfUri = uri
+            pdfUriString = uri?.toString()
+            selectedPages = emptyList()
+            generatedPaths = emptyList()
+            savedPaths = emptyList()
+            thumbnails.clear()
             uri?.let {
                 scope.launch {
                     loadThumbnails(it, context, thumbnails, { pageCount = it }, { isLoading = it })
@@ -85,7 +100,16 @@ fun PDFSplitterScreen(navController: NavController) {
                             
                             scope.launch {
                                 isLoading = true
-                                splitPdfAndSave(pdfUri!!, selectedPages.toList(), splitMode, rangeText, pageCount, context)
+                                val generatedFiles = splitPdf(
+                                    uri = pdfUri!!,
+                                    manualIndices = selectedPages,
+                                    mode = splitMode,
+                                    rangeText = rangeText,
+                                    maxPages = pageCount,
+                                    context = context
+                                )
+                                generatedPaths = generatedFiles.map(File::getAbsolutePath)
+                                savedPaths = emptyList()
                                 isLoading = false
                             }
                         }) {
@@ -113,13 +137,13 @@ fun PDFSplitterScreen(navController: NavController) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     // Split Mode Selector
                     TabRow(selectedTabIndex = splitMode.ordinal, containerColor = Color.Transparent) {
-                        Tab(selected = splitMode == SplitMode.Manual, onClick = { splitMode = SplitMode.Manual }) {
+                        Tab(selected = splitMode == SplitMode.Manual, onClick = { splitModeOrdinal = SplitMode.Manual.ordinal }) {
                             Text("Manual", modifier = Modifier.padding(12.dp))
                         }
-                        Tab(selected = splitMode == SplitMode.EveryPage, onClick = { splitMode = SplitMode.EveryPage }) {
+                        Tab(selected = splitMode == SplitMode.EveryPage, onClick = { splitModeOrdinal = SplitMode.EveryPage.ordinal }) {
                             Text("Every Page", modifier = Modifier.padding(12.dp))
                         }
-                        Tab(selected = splitMode == SplitMode.Range, onClick = { splitMode = SplitMode.Range }) {
+                        Tab(selected = splitMode == SplitMode.Range, onClick = { splitModeOrdinal = SplitMode.Range.ordinal }) {
                             Text("Range", modifier = Modifier.padding(12.dp))
                         }
                     }
@@ -149,8 +173,11 @@ fun PDFSplitterScreen(navController: NavController) {
                                                     index = index,
                                                     isSelected = selectedPages.contains(index),
                                                     onClick = {
-                                                        if (selectedPages.contains(index)) selectedPages.remove(index)
-                                                        else selectedPages.add(index)
+                                                        selectedPages = if (selectedPages.contains(index)) {
+                                                            selectedPages - index
+                                                        } else {
+                                                            selectedPages + index
+                                                        }
                                                     }
                                                 )
                                             }
@@ -183,7 +210,136 @@ fun PDFSplitterScreen(navController: NavController) {
                             }
                         }
                     }
-                }
+
+                    if (generatedPaths.isNotEmpty()) {
+                        val generatedFiles = generatedPaths.map(::File)
+                        val currentSavedPaths = savedPaths
+                        val savedFiles = currentSavedPaths.map(::File)
+                        val activeFiles = if (savedFiles.isNotEmpty()) savedFiles else generatedFiles
+
+                        if (generatedFiles.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Split Result Ready", fontWeight = FontWeight.Bold)
+                                            Text(
+                                                if (splitMode == SplitMode.EveryPage) {
+                                                    "${activeFiles.size} split PDFs"
+                                                } else {
+                                                    activeFiles.first().name
+                                                },
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                val fileToView = activeFiles.first()
+                                                val uriString = Uri.fromFile(fileToView).toString()
+                                                navController.navigate(Screen.PDFViewer.route + "?uri=${Uri.encode(uriString)}")
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(if (splitMode == SplitMode.EveryPage) "View First" else "View")
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                if (splitMode == SplitMode.EveryPage) {
+                                                    shareFilesAsZip(context, activeFiles)
+                                                } else {
+                                                    sharePdf(context, activeFiles.first())
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Share")
+                                        }
+                                        Button(
+                                            onClick = {
+                                                val saved = saveSplitResultToHistory(context, generatedFiles)
+                                                if (saved.isNotEmpty()) {
+                                                    savedPaths = saved.map(File::getAbsolutePath)
+                                                    android.widget.Toast.makeText(context, "Saved to PDF history", android.widget.Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    android.widget.Toast.makeText(context, "Could not save split PDF", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            enabled = currentSavedPaths.isEmpty()
+                                        ) {
+                                            Text("Save")
+                                            }
+                                        }
+                                    }
+
+                                    if (splitMode == SplitMode.EveryPage) {
+                                        HorizontalDivider()
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            activeFiles.forEachIndexed { index, file ->
+                                                OutlinedCard(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    onClick = {
+                                                        val uriString = Uri.fromFile(file).toString()
+                                                        navController.navigate(Screen.PDFViewer.route + "?uri=${Uri.encode(uriString)}")
+                                                    }
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.PictureAsPdf,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(Modifier.width(12.dp))
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                "Split File ${index + 1}",
+                                                                fontWeight = FontWeight.Medium
+                                                            )
+                                                            Text(
+                                                                file.name,
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                maxLines = 1
+                                                            )
+                                                        }
+                                                        TextButton(
+                                                            onClick = {
+                                                                val uriString = Uri.fromFile(file).toString()
+                                                                navController.navigate(Screen.PDFViewer.route + "?uri=${Uri.encode(uriString)}")
+                                                            }
+                                                        ) {
+                                                            Text("View")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
             }
             
             if (isLoading && splitMode != SplitMode.Manual) {
@@ -263,17 +419,17 @@ private suspend fun loadThumbnails(
     onLoading(false)
 }
 
-private suspend fun splitPdfAndSave(
+private suspend fun splitPdf(
     uri: Uri, 
     manualIndices: List<Int>, 
     mode: SplitMode, 
     rangeText: String,
     maxPages: Int,
     context: android.content.Context
-) {
-    withContext(Dispatchers.IO) {
+) : List<File> {
+    return withContext(Dispatchers.IO) {
         try {
-            val outDir = File(context.getExternalFilesDir(null), "EToolsPDF/Split_${System.currentTimeMillis()}")
+            val outDir = File(context.cacheDir, "Split_${System.currentTimeMillis()}")
             if (!outDir.exists()) outDir.mkdirs()
 
             val indicesToExtract = when (mode) {
@@ -282,9 +438,10 @@ private suspend fun splitPdfAndSave(
                 SplitMode.EveryPage -> (0 until maxPages).toList()
             }
 
-            if (indicesToExtract.isEmpty()) return@withContext
+            if (indicesToExtract.isEmpty()) return@withContext emptyList()
 
             if (mode == SplitMode.EveryPage) {
+                val outFiles = mutableListOf<File>()
                 // Save each page as a separate PDF
                 val fd = context.contentResolver.openFileDescriptor(uri, "r")
                 fd?.let { fileDescriptor ->
@@ -304,13 +461,12 @@ private suspend fun splitPdfAndSave(
                         pdfDocument.writeTo(FileOutputStream(outFile))
                         pdfDocument.close()
                         page.close()
+                        outFiles += outFile
                     }
                     renderer.close()
                     fileDescriptor.close()
                 }
-                withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(context, "Saved ${indicesToExtract.size} files to ${outDir.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
-                }
+                outFiles
             } else {
                 // Manual or Range: Save into a single PDF
                 val pdfDocument = android.graphics.pdf.PdfDocument()
@@ -334,14 +490,13 @@ private suspend fun splitPdfAndSave(
                 val outFile = File(outDir, "Split_Result.pdf")
                 pdfDocument.writeTo(FileOutputStream(outFile))
                 pdfDocument.close()
-                withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(context, "Saved to ${outFile.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
-                }
+                listOf(outFile)
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 android.widget.Toast.makeText(context, "Error: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
             }
+            emptyList()
         }
     }
 }
@@ -373,4 +528,52 @@ private fun parseRange(rangeStr: String, maxPages: Int): List<Int> {
         }
     } catch (e: Exception) {}
     return result.toList().sorted()
+}
+
+private fun sharePdf(context: android.content.Context, file: File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share PDF"))
+}
+
+private fun shareFilesAsZip(context: android.content.Context, files: List<File>) {
+    val zipFile = File(context.cacheDir, "Split_${System.currentTimeMillis()}.zip")
+    runCatching {
+        ZipOutputStream(FileOutputStream(zipFile)).use { zip ->
+            files.forEach { file ->
+                zip.putNextEntry(ZipEntry(file.name))
+                file.inputStream().use { input -> input.copyTo(zip) }
+                zip.closeEntry()
+            }
+        }
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", zipFile)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share Split PDFs"))
+    }.onFailure {
+        android.widget.Toast.makeText(context, "Could not share split PDFs", android.widget.Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun saveSplitResultToHistory(context: android.content.Context, files: List<File>): List<File> {
+    return runCatching {
+        val outDir = File(context.getExternalFilesDir(null), "ByteToolsPDF").apply { mkdirs() }
+        files.map { source ->
+            val targetName = if (source.name == "Split_Result.pdf") {
+                "Split_${System.currentTimeMillis()}.pdf"
+            } else {
+                "Split_${source.nameWithoutExtension}_${System.currentTimeMillis()}.pdf"
+            }
+            val target = File(outDir, targetName)
+            source.copyTo(target, overwrite = true)
+            target
+        }
+    }.getOrElse { emptyList() }
 }

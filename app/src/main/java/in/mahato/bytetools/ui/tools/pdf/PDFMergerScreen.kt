@@ -1,5 +1,6 @@
 package `in`.mahato.bytetools.ui.tools.pdf
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,10 +34,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.navigation.NavController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import `in`.mahato.bytetools.ui.navigation.Screen
 import java.io.File
 import java.io.FileOutputStream
 
@@ -44,13 +48,20 @@ import java.io.FileOutputStream
 fun PDFMergerScreen(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pdfUris = remember { mutableStateListOf<Uri>() }
+    var pdfUriStrings by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    var generatedPdfPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var savedPdfPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val pdfUris = remember(pdfUriStrings) { pdfUriStrings.map(Uri::parse) }
+    val generatedPdf = generatedPdfPath?.let(::File)
+    val savedPdf = savedPdfPath?.let(::File)
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments(),
         onResult = { uris ->
-            pdfUris.addAll(uris)
+            pdfUriStrings = pdfUriStrings + uris.map(Uri::toString)
+            generatedPdfPath = null
+            savedPdfPath = null
         }
     )
 
@@ -67,7 +78,9 @@ fun PDFMergerScreen(navController: NavController) {
                     if (pdfUris.size >= 2) {
                         IconButton(onClick = {
                             scope.launch {
-                                mergePdfsAndSave(pdfUris.toList(), context, { isLoading = it })
+                                val resultFile = mergePdfs(pdfUris.toList(), context, { isLoading = it })
+                                generatedPdfPath = resultFile?.absolutePath
+                                savedPdfPath = null
                             }
                         }) {
                             Icon(Icons.Default.MergeType, contentDescription = "Merge")
@@ -109,16 +122,80 @@ fun PDFMergerScreen(navController: NavController) {
                         PdfFileItem(
                             uri = uri,
                             index = index,
-                            onRemove = { pdfUris.removeAt(index) },
+                            onRemove = {
+                                pdfUriStrings = pdfUriStrings.toMutableList().apply { removeAt(index) }
+                            },
                             onMoveUp = { if (index > 0) {
-                                val item = pdfUris.removeAt(index)
-                                pdfUris.add(index - 1, item)
+                                val items = pdfUriStrings.toMutableList()
+                                val item = items.removeAt(index)
+                                items.add(index - 1, item)
+                                pdfUriStrings = items
                             }},
                             onMoveDown = { if (index < pdfUris.size - 1) {
-                                val item = pdfUris.removeAt(index)
-                                pdfUris.add(index + 1, item)
+                                val items = pdfUriStrings.toMutableList()
+                                val item = items.removeAt(index)
+                                items.add(index + 1, item)
+                                pdfUriStrings = items
                             }}
                         )
+                    }
+                    generatedPdf?.let { file ->
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("PDF Ready", fontWeight = FontWeight.Bold)
+                                            Text((savedPdf ?: file).name, style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                val uriString = Uri.fromFile(savedPdf ?: file).toString()
+                                                navController.navigate(Screen.PDFViewer.route + "?uri=${Uri.encode(uriString)}")
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("View")
+                                        }
+                                        OutlinedButton(
+                                            onClick = { sharePdf(context, savedPdf ?: file) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Share")
+                                        }
+                                        Button(
+                                            onClick = {
+                                                val result = savePdfToHistory(context, file)
+                                                if (result != null) {
+                                                    savedPdfPath = result.absolutePath
+                                                    android.widget.Toast.makeText(context, "Saved to PDF history", android.widget.Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    android.widget.Toast.makeText(context, "Could not save PDF", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            enabled = savedPdf == null
+                                        ) {
+                                            Text("Save")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -185,18 +262,16 @@ fun PdfFileItem(uri: Uri, index: Int, onRemove: () -> Unit, onMoveUp: () -> Unit
     }
 }
 
-private suspend fun mergePdfsAndSave(uris: List<Uri>, context: android.content.Context, onLoading: (Boolean) -> Unit) {
+private suspend fun mergePdfs(uris: List<Uri>, context: android.content.Context, onLoading: (Boolean) -> Unit): File? {
     onLoading(true)
-    withContext(Dispatchers.IO) {
+    val result = withContext(Dispatchers.IO) {
         val outFileName = "Merged_${System.currentTimeMillis()}.pdf"
-        val outDir = File(context.getExternalFilesDir(null), "ByteToolsPDF")
-        if (!outDir.exists()) outDir.mkdirs()
-        val outFile = File(outDir, outFileName)
+        val outFile = File(context.cacheDir, outFileName)
 
         val pdfDocument = android.graphics.pdf.PdfDocument()
         
         try {
-            uris.forEachIndexed { docIdx, uri ->
+            uris.forEach { uri ->
                 val fileDescriptor: ParcelFileDescriptor? = context.contentResolver.openFileDescriptor(uri, "r")
                 fileDescriptor?.let { fd ->
                     val renderer = PdfRenderer(fd)
@@ -215,15 +290,40 @@ private suspend fun mergePdfsAndSave(uris: List<Uri>, context: android.content.C
                 }
             }
             pdfDocument.writeTo(FileOutputStream(outFile))
+            outFile
         } catch (e: Exception) {
             e.printStackTrace()
+            null
         } finally {
             pdfDocument.close()
         }
-
-        withContext(Dispatchers.Main) {
-            android.widget.Toast.makeText(context, "Merged into ${outFile.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+    }
+    withContext(Dispatchers.Main) {
+        if (result != null) {
+            android.widget.Toast.makeText(context, "Merged PDF generated", android.widget.Toast.LENGTH_LONG).show()
+        } else {
+            android.widget.Toast.makeText(context, "Could not merge PDFs", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     onLoading(false)
+    return result
+}
+
+private fun sharePdf(context: android.content.Context, file: File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share PDF"))
+}
+
+private fun savePdfToHistory(context: android.content.Context, sourceFile: File): File? {
+    return runCatching {
+        val outDir = File(context.getExternalFilesDir(null), "ByteToolsPDF").apply { mkdirs() }
+        val outFile = File(outDir, sourceFile.name)
+        sourceFile.copyTo(outFile, overwrite = true)
+        outFile
+    }.getOrNull()
 }

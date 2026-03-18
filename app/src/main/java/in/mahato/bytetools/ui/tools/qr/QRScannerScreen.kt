@@ -23,10 +23,12 @@ import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,6 +61,7 @@ fun QRScannerScreen(
     
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var scannedBarcode by remember { mutableStateOf<Barcode?>(null) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -92,22 +95,37 @@ fun QRScannerScreen(
                 )
         ) {
             if (showHistory) {
-                HistoryView(scanHistory, context)
+                HistoryView(scanHistory, context, onDelete = { viewModel.deleteScanResult(it.id) })
             } else {
                 if (cameraPermissionState.status.isGranted) {
-                    CameraPreview(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        onBarcodeDetected = { barcodes ->
-                            barcodes.firstOrNull()?.rawValue?.let { value ->
-                                viewModel.onScanDetected(value, "QR_CODE")
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Scanned: $value")
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        CameraPreview(
+                            modifier = Modifier.fillMaxSize(),
+                            onBarcodeDetected = { barcodes ->
+                                if (scannedBarcode == null) {
+                                    val barcode = barcodes.firstOrNull()
+                                    if (barcode?.rawValue != null) {
+                                        scannedBarcode = barcode
+                                    }
                                 }
                             }
+                        )
+                        
+                        scannedBarcode?.let { barcode ->
+                            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) {
+                                ScanResultCard(
+                                    barcode = barcode,
+                                    onSave = { 
+                                        viewModel.onScanDetected(barcode.rawValue!!, "QR_CODE")
+                                        scope.launch { snackbarHostState.showSnackbar("Saved to History") }
+                                        scannedBarcode = null
+                                    },
+                                    onDismiss = { scannedBarcode = null },
+                                    context = context
+                                )
+                            }
                         }
-                    )
+                    }
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                         Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
@@ -121,7 +139,35 @@ fun QRScannerScreen(
 }
 
 @Composable
-fun HistoryView(history: List<`in`.mahato.bytetools.domain.model.ScanResult>, context: android.content.Context) {
+fun HistoryView(
+    history: List<`in`.mahato.bytetools.domain.model.ScanResult>,
+    context: android.content.Context,
+    onDelete: ((`in`.mahato.bytetools.domain.model.ScanResult) -> Unit)? = null
+) {
+    var linkToOpen by remember { mutableStateOf<String?>(null) }
+    
+    if (linkToOpen != null) {
+        AlertDialog(
+            onDismissRequest = { linkToOpen = null },
+            title = { Text("Open Link") },
+            text = { Text("Do you want to open this link in your browser?\n\n$linkToOpen") },
+            confirmButton = {
+                TextButton(onClick = {
+                    try {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(linkToOpen))
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    linkToOpen = null
+                }) { Text("Open") }
+            },
+            dismissButton = {
+                TextButton(onClick = { linkToOpen = null }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (history.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
             Text("No history yet")
@@ -136,24 +182,77 @@ fun HistoryView(history: List<`in`.mahato.bytetools.domain.model.ScanResult>, co
                         Text(item.content, style = MaterialTheme.typography.bodyLarge)
                         Text(item.format, style = MaterialTheme.typography.labelSmall)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = {
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("Scan Result", item.content)
-                                clipboard.setPrimaryClip(clip)
-                            }) {
-                                Text("Copy")
-                            }
-                            TextButton(onClick = {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(android.content.Intent.EXTRA_TEXT, item.content)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Scan Result", item.content)
+                                    clipboard.setPrimaryClip(clip)
+                                }) {
+                                    Text("Copy")
                                 }
-                                context.startActivity(android.content.Intent.createChooser(intent, "Share via"))
-                            }) {
-                                Text("Share")
+                                TextButton(onClick = {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(android.content.Intent.EXTRA_TEXT, item.content)
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(intent, "Share via"))
+                                }) {
+                                    Text("Share")
+                                }
+                                if (android.util.Patterns.WEB_URL.matcher(item.content).matches()) {
+                                    TextButton(onClick = { linkToOpen = item.content }) {
+                                        Text("Open")
+                                    }
+                                }
+                            }
+                            if (onDelete != null) {
+                                IconButton(onClick = { onDelete(item) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Gray)
+                                }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ScanResultCard(
+    barcode: Barcode,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+    context: android.content.Context
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Scan Result", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(barcode.rawValue ?: "", style = MaterialTheme.typography.bodyLarge)
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Rescan")
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("Scan Result", barcode.rawValue)
+                        clipboard.setPrimaryClip(clip)
+                    }) {
+                        Text("Copy")
+                    }
+                    Button(onClick = onSave) {
+                        Text("Save")
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package `in`.mahato.bytetools.ui.tools.pdf
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,12 +14,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.navigation.NavController
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
@@ -30,27 +33,43 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import `in`.mahato.bytetools.ui.navigation.Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PDFWatermarkScreen(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var pdfUri by remember { mutableStateOf<Uri?>(null) }
-    var watermarkUri by remember { mutableStateOf<Uri?>(null) }
-    var watermarkText by remember { mutableStateOf("WATERMARK") }
-    var opacity by remember { mutableFloatStateOf(0.3f) }
+    var pdfUriString by rememberSaveable { mutableStateOf<String?>(null) }
+    var watermarkUriString by rememberSaveable { mutableStateOf<String?>(null) }
+    var watermarkText by rememberSaveable { mutableStateOf("WATERMARK") }
+    var opacity by rememberSaveable { mutableFloatStateOf(0.3f) }
     var isLoading by remember { mutableStateOf(false) }
-    var selectedType by remember { mutableIntStateOf(0) } // 0: Text, 1: Image
+    var selectedType by rememberSaveable { mutableIntStateOf(0) } // 0: Text, 1: Image
+    var generatedPdfPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var savedPdfPath by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val pdfUri = pdfUriString?.let(Uri::parse)
+    val watermarkUri = watermarkUriString?.let(Uri::parse)
+    val generatedPdf = generatedPdfPath?.let(::File)
+    val savedPdf = savedPdfPath?.let(::File)
 
     val pdfPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
-        onResult = { pdfUri = it }
+        onResult = {
+            pdfUriString = it?.toString()
+            generatedPdfPath = null
+            savedPdfPath = null
+        }
     )
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
-        onResult = { watermarkUri = it }
+        onResult = {
+            watermarkUriString = it?.toString()
+            generatedPdfPath = null
+            savedPdfPath = null
+        }
     )
 
     Scaffold(
@@ -67,13 +86,15 @@ fun PDFWatermarkScreen(navController: NavController) {
                         IconButton(onClick = {
                             scope.launch {
                                 isLoading = true
-                                addWatermarkWithPdfBox(
+                                val resultFile = addWatermarkWithPdfBox(
                                     pdfUri!!,
                                     if (selectedType == 0) watermarkText else null,
                                     if (selectedType == 1) watermarkUri else null,
                                     opacity,
                                     context
                                 )
+                                generatedPdfPath = resultFile?.absolutePath
+                                savedPdfPath = null
                                 isLoading = false
                             }
                         }) {
@@ -161,6 +182,57 @@ fun PDFWatermarkScreen(navController: NavController) {
                 )
 
                 Spacer(Modifier.height(40.dp))
+
+                generatedPdf?.let { file ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("PDF Ready", fontWeight = FontWeight.Bold)
+                                    Text((savedPdf ?: file).name, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val uriString = Uri.fromFile(savedPdf ?: file).toString()
+                                        navController.navigate(Screen.PDFViewer.route + "?uri=${Uri.encode(uriString)}")
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("View")
+                                }
+                                OutlinedButton(
+                                    onClick = { sharePdf(context, savedPdf ?: file) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Share")
+                                }
+                                Button(
+                                    onClick = {
+                                        val result = savePdfToHistory(context, file)
+                                        if (result != null) {
+                                            savedPdfPath = result.absolutePath
+                                            android.widget.Toast.makeText(context, "Saved to PDF history", android.widget.Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            android.widget.Toast.makeText(context, "Could not save PDF", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    enabled = savedPdf == null
+                                ) {
+                                    Text("Save")
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             if (isLoading) {
@@ -178,13 +250,11 @@ private suspend fun addWatermarkWithPdfBox(
     imageUri: Uri?,
     opacity: Float,
     context: android.content.Context
-) {
-    withContext(Dispatchers.IO) {
+) : File? {
+    return withContext(Dispatchers.IO) {
         try {
             val outFileName = "Watermarked_${System.currentTimeMillis()}.pdf"
-            val outDir = File(context.getExternalFilesDir(null), "ByteToolsPDF")
-            if (!outDir.exists()) outDir.mkdirs()
-            val outFile = File(outDir, outFileName)
+            val outFile = File(context.cacheDir, outFileName)
 
             val inputStream = context.contentResolver.openInputStream(uri)
             val document = PDDocument.load(inputStream)
@@ -242,12 +312,33 @@ private suspend fun addWatermarkWithPdfBox(
             inputStream?.close()
 
             withContext(Dispatchers.Main) {
-                android.widget.Toast.makeText(context, "Saved to ${outFile.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(context, "Watermarked PDF generated", android.widget.Toast.LENGTH_LONG).show()
             }
+            outFile
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 android.widget.Toast.makeText(context, "Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
             }
+            null
         }
     }
+}
+
+private fun sharePdf(context: android.content.Context, file: File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share PDF"))
+}
+
+private fun savePdfToHistory(context: android.content.Context, sourceFile: File): File? {
+    return runCatching {
+        val outDir = File(context.getExternalFilesDir(null), "ByteToolsPDF").apply { mkdirs() }
+        val outFile = File(outDir, sourceFile.name)
+        sourceFile.copyTo(outFile, overwrite = true)
+        outFile
+    }.getOrNull()
 }

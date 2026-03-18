@@ -43,7 +43,13 @@ class BarcodeViewModel @Inject constructor(
                     }
                 }
                 _generatedBarcode.value = bitmap
-                qrDao.insertQR(QRRecord(type = format.name, content = content))
+                qrDao.insertQR(
+                    QRRecord(
+                        type = "BARCODE",
+                        barcodeFormat = format.name,
+                        content = content
+                    )
+                )
             } catch (e: Exception) {
                 _generatedBarcode.value = null
             }

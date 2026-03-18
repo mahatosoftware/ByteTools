@@ -1,5 +1,6 @@
 package `in`.mahato.bytetools.ui.tools.pdf
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.net.Uri
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
 import androidx.navigation.NavController
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
@@ -51,6 +53,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import `in`.mahato.bytetools.ui.navigation.Screen
 
 data class ColoredPath(val path: ComposePath, val color: Color)
 
@@ -66,11 +69,15 @@ fun PDFSignScreen(navController: NavController) {
     var selectedPage by remember { mutableIntStateOf(0) }
     var totalPages by remember { mutableIntStateOf(0) }
     var signAllPages by remember { mutableStateOf(false) }
+    var generatedPdf by remember { mutableStateOf<File?>(null) }
+    var savedPdf by remember { mutableStateOf<File?>(null) }
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri ->
             pdfUri = uri
+            generatedPdf = null
+            savedPdf = null
             uri?.let {
                 totalPages = getCountWithPdfBox(it, context)
             }
@@ -92,7 +99,8 @@ fun PDFSignScreen(navController: NavController) {
                             scope.launch {
                                 isLoading = true
                                 val pagesToSign = if (signAllPages) (0 until totalPages).toList() else listOf(selectedPage)
-                                signWithPdfBox(pdfUri!!, signatureBitmap!!, pagesToSign, context)
+                                generatedPdf = signWithPdfBox(pdfUri!!, signatureBitmap!!, pagesToSign, context)
+                                savedPdf = null
                                 isLoading = false
                             }
                         }) {
@@ -192,6 +200,66 @@ fun PDFSignScreen(navController: NavController) {
                                             valueRange = 0f..(if (totalPages > 0) totalPages - 1 else 0).toFloat(),
                                             steps = if (totalPages > 1) totalPages - 2 else 0
                                         )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(24.dp))
+
+                        generatedPdf?.let { file ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("PDF Ready", fontWeight = FontWeight.Bold)
+                                            Text((savedPdf ?: file).name, style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                val uriString = Uri.fromFile(savedPdf ?: file).toString()
+                                                navController.navigate(Screen.PDFViewer.route + "?uri=${Uri.encode(uriString)}")
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("View")
+                                        }
+                                        OutlinedButton(
+                                            onClick = { sharePdf(context, savedPdf ?: file) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Share")
+                                        }
+                                        Button(
+                                            onClick = {
+                                                val result = savePdfToHistory(context, file)
+                                                if (result != null) {
+                                                    savedPdf = result
+                                                    android.widget.Toast.makeText(context, "Saved to PDF history", android.widget.Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    android.widget.Toast.makeText(context, "Could not save PDF", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            enabled = savedPdf == null
+                                        ) {
+                                            Text("Save")
+                                        }
                                     }
                                 }
                             }
@@ -332,7 +400,10 @@ fun SignaturePad(onDismiss: () -> Unit, onCapture: (Bitmap) -> Unit) {
 
                 // Footer Buttons
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     OutlinedButton(
@@ -376,7 +447,9 @@ fun SignaturePad(onDismiss: () -> Unit, onCapture: (Bitmap) -> Unit) {
                 if (!isLandscape) {
                     Text(
                         "Tip: Rotate for more space.",
-                        modifier = Modifier.padding(bottom = 16.dp).align(Alignment.CenterHorizontally),
+                        modifier = Modifier
+                            .padding(bottom = 16.dp)
+                            .align(Alignment.CenterHorizontally),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -397,13 +470,11 @@ private fun getCountWithPdfBox(uri: Uri, context: android.content.Context): Int 
     } catch (e: Exception) { 0 }
 }
 
-private suspend fun signWithPdfBox(uri: Uri, sig: Bitmap, pagesIdx: List<Int>, context: android.content.Context) {
-    withContext(Dispatchers.IO) {
+private suspend fun signWithPdfBox(uri: Uri, sig: Bitmap, pagesIdx: List<Int>, context: android.content.Context): File? {
+    return withContext(Dispatchers.IO) {
         try {
             val outFileName = "Signed_Multi_${System.currentTimeMillis()}.pdf"
-            val outDir = File(context.getExternalFilesDir(null), "ByteToolsPDF")
-            if (!outDir.exists()) outDir.mkdirs()
-            val outFile = File(outDir, outFileName)
+            val outFile = File(context.cacheDir, outFileName)
 
             val inputStream = context.contentResolver.openInputStream(uri)
             val doc = PDDocument.load(inputStream)
@@ -430,14 +501,35 @@ private suspend fun signWithPdfBox(uri: Uri, sig: Bitmap, pagesIdx: List<Int>, c
             inputStream?.close()
 
             withContext(Dispatchers.Main) {
-                android.widget.Toast.makeText(context, "Signed ${pagesIdx.size} pages. Saved to ${outFile.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(context, "Signed PDF generated", android.widget.Toast.LENGTH_LONG).show()
             }
+            outFile
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 android.widget.Toast.makeText(context, "Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
             }
+            null
         }
     }
+}
+
+private fun sharePdf(context: android.content.Context, file: File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share PDF"))
+}
+
+private fun savePdfToHistory(context: android.content.Context, sourceFile: File): File? {
+    return runCatching {
+        val outDir = File(context.getExternalFilesDir(null), "ByteToolsPDF").apply { mkdirs() }
+        val outFile = File(outDir, sourceFile.name)
+        sourceFile.copyTo(outFile, overwrite = true)
+        outFile
+    }.getOrNull()
 }
 
 private fun makeTransparent(bitmap: Bitmap): Bitmap {

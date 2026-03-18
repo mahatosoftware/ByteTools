@@ -58,23 +58,9 @@ fun BarcodeScannerScreen(
     var lastScannedValue by remember { mutableStateOf<String?>(null) }
     var showResultDialog by remember { mutableStateOf(false) }
     var scannedFormat by remember { mutableStateOf("") }
-
-    if (showResultDialog) {
-        ScanResultDialog(
-            value = lastScannedValue ?: "",
-            format = scannedFormat,
-            onDismiss = { 
-                showResultDialog = false
-                lastScannedValue = null 
-            },
-            onSave = {
-                viewModel.saveScanResult(lastScannedValue ?: "", scannedFormat)
-                showResultDialog = false
-                lastScannedValue = null
-            }
-        )
-    }
-
+    
+    var showHistory by remember { mutableStateOf(false) }
+    val scanHistory by viewModel.scanHistory.collectAsState()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -91,8 +77,8 @@ fun BarcodeScannerScreen(
                     }) {
                         Icon(if (isFlashOn) Icons.Default.FlashOn else Icons.Default.FlashOff, contentDescription = "Flash")
                     }
-                    IconButton(onClick = { navController.navigate(Screen.QRHistory.route) }) {
-                        Icon(Icons.Default.History, contentDescription = "History")
+                    IconButton(onClick = { showHistory = !showHistory }) {
+                        Icon(if (showHistory) Icons.Default.CameraAlt else Icons.Default.History, contentDescription = "History")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -105,26 +91,55 @@ fun BarcodeScannerScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black)) {
-            if (cameraPermissionState.status.isGranted) {
-                CameraPreviewWithOverlay(
-                    onBarcodeDetected = { barcodes ->
-                        val barcode = barcodes.firstOrNull()
-                        if (barcode != null && barcode.rawValue != lastScannedValue) {
-                            vibrate(context)
-                            lastScannedValue = barcode.rawValue
-                            scannedFormat = getBarcodeFormatName(barcode.format)
-                            showResultDialog = true
-                        }
-                    },
-                    onCameraControlReady = { cameraControl = it }
+            if (showHistory) {
+                `in`.mahato.bytetools.ui.tools.qr.HistoryView(
+                    history = scanHistory,
+                    context = context,
+                    onDelete = { viewModel.deleteScan(it.id) }
                 )
             } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Camera permission is required", color = Color.White)
-                        Spacer(Modifier.height(16.dp))
-                        Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
-                            Text("Grant Permission")
+                if (cameraPermissionState.status.isGranted) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CameraPreviewWithOverlay(
+                            onBarcodeDetected = { barcodes ->
+                                val barcode = barcodes.firstOrNull()
+                                if (barcode != null && barcode.rawValue != lastScannedValue) {
+                                    vibrate(context)
+                                    lastScannedValue = barcode.rawValue
+                                    scannedFormat = getBarcodeFormatName(barcode.format)
+                                    showResultDialog = true
+                                }
+                            },
+                            onCameraControlReady = { cameraControl = it }
+                        )
+                        
+                        if (showResultDialog) {
+                            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
+                                ScanResultCard(
+                                    value = lastScannedValue ?: "",
+                                    format = scannedFormat,
+                                    onDismiss = { 
+                                        showResultDialog = false
+                                        lastScannedValue = null 
+                                    },
+                                    onSave = {
+                                        viewModel.saveScanResult(lastScannedValue ?: "", scannedFormat)
+                                        showResultDialog = false
+                                        lastScannedValue = null
+                                    },
+                                    context = context
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Camera permission is required", color = Color.White)
+                            Spacer(Modifier.height(16.dp))
+                            Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
+                                Text("Grant Permission")
+                            }
                         }
                     }
                 }
@@ -261,51 +276,47 @@ private fun processImageProxy(
 }
 
 @Composable
-fun ScanResultDialog(value: String, format: String, onDismiss: () -> Unit, onSave: () -> Unit) {
-    val context = LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Scan Result") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Format: $format", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                
-                Spacer(Modifier.height(16.dp))
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { 
+fun ScanResultCard(
+    value: String,
+    format: String,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+    context: android.content.Context
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Scan Result", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text("Format: $format", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(value, style = MaterialTheme.typography.bodyLarge)
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Rescan")
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         val clip = android.content.ClipData.newPlainText("Scan Result", value)
                         clipboard.setPrimaryClip(clip)
                         android.widget.Toast.makeText(context, "Copied", android.widget.Toast.LENGTH_SHORT).show()
-                    }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
+                    }) {
                         Text("Copy")
                     }
-                    
-                    Button(onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(android.content.Intent.EXTRA_TEXT, value)
-                        }
-                        context.startActivity(android.content.Intent.createChooser(intent, "Share"))
-                    }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Share")
+                    Button(onClick = onSave) {
+                        Text("Save")
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onSave) { Text("Save to History") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
         }
-    )
+    }
 }
 
 fun vibrate(context: Context) {
