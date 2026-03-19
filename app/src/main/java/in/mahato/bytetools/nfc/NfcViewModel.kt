@@ -33,6 +33,7 @@ class NfcViewModel @Inject constructor(
         viewModelScope.launch {
             nfcManager.tagFlow.collectLatest { tag ->
                 handleTag(tag)
+                nfcManager.clearLastTag()
             }
         }
     }

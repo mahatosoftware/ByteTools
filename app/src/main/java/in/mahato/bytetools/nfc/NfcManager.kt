@@ -16,7 +16,7 @@ import javax.inject.Singleton
 @Singleton
 class NfcManager @Inject constructor() : NfcAdapter.ReaderCallback {
 
-    private val _tagFlow = MutableSharedFlow<Tag>(extraBufferCapacity = 1)
+    private val _tagFlow = MutableSharedFlow<Tag>(replay = 1, extraBufferCapacity = 1)
     val tagFlow = _tagFlow.asSharedFlow()
 
     fun onNewIntent(intent: Intent) {
@@ -38,6 +38,10 @@ class NfcManager @Inject constructor() : NfcAdapter.ReaderCallback {
 
     override fun onTagDiscovered(tag: Tag?) {
         tag?.let { _tagFlow.tryEmit(it) }
+    }
+
+    fun clearLastTag() {
+        _tagFlow.resetReplayCache()
     }
 
     fun enableForegroundDispatch(activity: ComponentActivity) {

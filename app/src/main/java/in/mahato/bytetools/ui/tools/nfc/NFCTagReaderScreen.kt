@@ -150,6 +150,7 @@ fun NFCTagReaderScreen(navController: NavController, viewModel: NfcViewModel = h
 
 fun getRecordIcon(type: RecordType): androidx.compose.ui.graphics.vector.ImageVector {
     return when (type) {
+        RecordType.AUTOMATION -> Icons.Default.SmartButton
         RecordType.TEXT -> Icons.Default.TextFields
         RecordType.URI -> Icons.Default.Link
         RecordType.VCARD -> Icons.Default.Contacts
@@ -173,6 +174,11 @@ fun getRecordActions(
     })
 
     when (record.type) {
+        RecordType.AUTOMATION -> {
+            actions.add("Run Automation" to {
+                runAutomation(context, clipboardManager, record.data)
+            })
+        }
         RecordType.URI -> {
             actions.add("Open URL" to {
                 try {
@@ -251,4 +257,19 @@ fun getRecordActions(
     }
     
     return actions
+}
+
+private fun runAutomation(
+    context: Context,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    automationName: String
+) {
+    if (!NfcAutomationExecutor.run(context, automationName)) {
+        try {
+            clipboardManager.setText(AnnotatedString(automationName))
+            Toast.makeText(context, "Automation copied: $automationName", Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+            Toast.makeText(context, "Could not run automation", Toast.LENGTH_SHORT).show()
+        }
+    }
 }

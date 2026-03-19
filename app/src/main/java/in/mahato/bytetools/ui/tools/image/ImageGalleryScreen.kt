@@ -1,5 +1,6 @@
 package `in`.mahato.bytetools.ui.tools.image
 
+import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
@@ -74,6 +75,9 @@ fun ImageGalleryScreen(navController: NavController) {
                         }
                     },
                     actions = {
+                        IconButton(onClick = { shareImages(context, selectedUris.toList()) }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share selected")
+                        }
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete selected")
                         }
@@ -275,6 +279,27 @@ private suspend fun deleteImages(context: android.content.Context, uris: List<Ur
     } catch (e: Exception) {
         e.printStackTrace()
     }
+}
+
+private fun shareImages(context: android.content.Context, uris: List<Uri>) {
+    if (uris.isEmpty()) return
+
+    val shareIntent = if (uris.size == 1) {
+        Intent(Intent.ACTION_SEND).apply {
+            type = "image/*"
+            putExtra(Intent.EXTRA_STREAM, uris.first())
+        }
+    } else {
+        Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "image/*"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+        }
+    }.apply {
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    val chooserTitle = if (uris.size == 1) "Share image" else "Share images"
+    context.startActivity(Intent.createChooser(shareIntent, chooserTitle))
 }
 
 private fun formatFileSize(size: Long): String {

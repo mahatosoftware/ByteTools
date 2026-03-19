@@ -1,5 +1,9 @@
 package `in`.mahato.bytetools
 
+import android.content.Intent
+import android.nfc.NfcAdapter
+import android.nfc.Tag
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -18,18 +22,50 @@ import androidx.navigation.compose.rememberNavController
 import `in`.mahato.bytetools.ui.navigation.BottomNavigationBar
 
 import `in`.mahato.bytetools.nfc.NfcManager
-import android.content.Intent
+import `in`.mahato.bytetools.nfc.NfcUtils
+import `in`.mahato.bytetools.nfc.NfcState
+import `in`.mahato.bytetools.nfc.NfcViewModel
+import `in`.mahato.bytetools.nfc.RecordType
+import `in`.mahato.bytetools.nfc.NfcAutomationExecutor
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
+    private val nfcViewModel: NfcViewModel by viewModels()
 
     @Inject
     lateinit var nfcManager: NfcManager
 
+    private var lastAutomationRun: String? = null
+    private var pendingAutomationRun: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        nfcViewModel
+        processAutomationIntent(intent)
+        nfcManager.onNewIntent(intent)
+
+        lifecycleScope.launch {
+            nfcViewModel.nfcState.collect { state ->
+                if (state is NfcState.Success) {
+                    val automation = state.parsedRecords
+                        .firstOrNull { it.type == RecordType.AUTOMATION }
+                        ?.data
+
+                    if (!automation.isNullOrBlank() && automation != lastAutomationRun) {
+                        pendingAutomationRun = automation
+                        runPendingAutomation()
+                    }
+                } else {
+                    lastAutomationRun = null
+                }
+            }
+        }
+
         enableEdgeToEdge()
         setContent {
             val themeMode by mainViewModel.themeMode.collectAsState(initial = "system")
@@ -63,6 +99,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         nfcManager.enableForegroundDispatch(this)
+        runPendingAutomation()
     }
 
     override fun onPause() {
@@ -72,6 +109,53 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        processAutomationIntent(intent)
         nfcManager.onNewIntent(intent)
+    }
+
+    private fun processAutomationIntent(intent: Intent) {
+        NfcAutomationExecutor.automationNameFromUri(intent.data)?.let { automation ->
+            if (automation != lastAutomationRun) {
+                pendingAutomationRun = automation
+            }
+        }
+
+        if (intent.action !in listOf(
+                NfcAdapter.ACTION_TAG_DISCOVERED,
+                NfcAdapter.ACTION_TECH_DISCOVERED,
+                NfcAdapter.ACTION_NDEF_DISCOVERED
+            )
+        ) {
+            return
+        }
+
+        val tag: Tag? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+        }
+
+        val automation = tag
+            ?.let { NfcUtils.getParsedNdefRecords(it) }
+            ?.firstOrNull { it.type == RecordType.AUTOMATION }
+            ?.data
+
+        if (!automation.isNullOrBlank() && automation != lastAutomationRun) {
+            pendingAutomationRun = automation
+        }
+    }
+
+    private fun runPendingAutomation() {
+        val automation = pendingAutomationRun ?: return
+        if (automation == lastAutomationRun) return
+
+        lifecycleScope.launch {
+            delay(300)
+            if (pendingAutomationRun == automation && NfcAutomationExecutor.run(this@MainActivity, automation)) {
+                lastAutomationRun = automation
+                pendingAutomationRun = null
+            }
+        }
     }
 }

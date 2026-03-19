@@ -8,7 +8,7 @@ import android.nfc.tech.NdefFormatable
 import java.nio.charset.Charset
 
 enum class RecordType {
-    TEXT, URI, VCARD, WIFI, APP_LAUNCH, MIME, UNKNOWN, EMPTY
+    TEXT, URI, VCARD, WIFI, APP_LAUNCH, MIME, AUTOMATION, UNKNOWN, EMPTY
 }
 
 data class ParsedNdefRecord(
@@ -97,6 +97,9 @@ object NfcUtils {
                 if (record.type.contentEquals(NdefRecord.RTD_TEXT)) {
                     val languageCodeLength = (payload[0].toInt() and 0x3F)
                     val text = String(payload, languageCodeLength + 1, payload.size - languageCodeLength - 1, Charset.forName("UTF-8"))
+                    if (text.startsWith("AUTO_TASK:")) {
+                        return ParsedNdefRecord(RecordType.AUTOMATION, text.removePrefix("AUTO_TASK:").trim())
+                    }
                     return ParsedNdefRecord(RecordType.TEXT, text)
                 } else if (record.type.contentEquals(NdefRecord.RTD_URI)) {
                     val uriPrefixes = arrayOf(
@@ -145,6 +148,9 @@ object NfcUtils {
             }
         }
         val content = String(payload, Charset.forName("UTF-8"))
+        if (content.startsWith("AUTO_TASK:")) {
+            return ParsedNdefRecord(RecordType.AUTOMATION, content.removePrefix("AUTO_TASK:").trim())
+        }
         if (content.startsWith("WIFI:S:")) {
             return ParsedNdefRecord(RecordType.WIFI, content)
         }

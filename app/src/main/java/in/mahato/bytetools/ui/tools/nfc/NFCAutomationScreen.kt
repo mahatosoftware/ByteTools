@@ -65,8 +65,12 @@ fun NFCAutomationScreen(navController: NavController, viewModel: NfcViewModel = 
             items(triggers) { trigger ->
                 Card(
                     onClick = {
-                        val record = NfcUtils.createTextRecord("AUTO_TASK:$trigger")
-                        viewModel.setPendingWriteMessage(NdefMessage(arrayOf(record)))
+                        val automationUriRecord = NfcUtils.createUriRecord(NfcAutomationExecutor.automationUriFor(trigger))
+                        val automationTextRecord = NfcUtils.createTextRecord("AUTO_TASK:$trigger")
+                        val appRecord = android.nfc.NdefRecord.createApplicationRecord("in.mahato.bytetools")
+                        viewModel.setPendingWriteMessage(
+                            NdefMessage(arrayOf(automationUriRecord, automationTextRecord, appRecord))
+                        )
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
