@@ -46,8 +46,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         nfcViewModel
-        processAutomationIntent(intent)
-        nfcManager.onNewIntent(intent)
+        scheduleNfcIntentHandling(intent)
 
         lifecycleScope.launch {
             nfcViewModel.nfcState.collect { state ->
@@ -109,8 +108,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        processAutomationIntent(intent)
-        nfcManager.onNewIntent(intent)
+        setIntent(intent)
+        scheduleNfcIntentHandling(intent)
+    }
+
+    private fun scheduleNfcIntentHandling(intent: Intent) {
+        lifecycleScope.launch {
+            delay(300)
+            processAutomationIntent(intent)
+            runPendingAutomation()
+            nfcManager.onNewIntent(intent)
+        }
     }
 
     private fun processAutomationIntent(intent: Intent) {

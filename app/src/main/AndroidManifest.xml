@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <queries>
@@ -36,7 +37,7 @@
         <activity
             android:name="in.mahato.bytetools.MainActivity"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.ByteTools">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -51,6 +52,10 @@
             </intent-filter>
             <intent-filter>
                 <action android:name="android.nfc.action.TECH_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.TAG_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <meta-data
