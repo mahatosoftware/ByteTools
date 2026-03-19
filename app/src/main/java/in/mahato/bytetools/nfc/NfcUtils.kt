@@ -5,6 +5,7 @@ import android.nfc.NdefRecord
 import android.nfc.Tag
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
+import android.os.Parcelable
 import java.nio.charset.Charset
 
 enum class RecordType {
@@ -78,14 +79,27 @@ object NfcUtils {
         try {
             ndef.connect()
             val ndefMessage = ndef.cachedNdefMessage ?: return emptyList()
-            val records = ndefMessage.records ?: return emptyList()
-            
-            return records.map { parseToRecord(it) }
+            return getParsedNdefRecords(ndefMessage)
         } catch (e: Exception) {
             return emptyList()
         } finally {
             try { ndef.close() } catch (_: Exception) {}
         }
+    }
+
+    fun getParsedNdefRecords(message: NdefMessage): List<ParsedNdefRecord> {
+        val records = message.records ?: return emptyList()
+        return records.map { parseToRecord(it) }
+    }
+
+    fun getParsedNdefRecords(rawMessages: Array<Parcelable>?): List<ParsedNdefRecord> {
+        val messages = rawMessages
+            ?.mapNotNull { it as? NdefMessage }
+            .orEmpty()
+
+        if (messages.isEmpty()) return emptyList()
+
+        return messages.flatMap { getParsedNdefRecords(it) }
     }
 
     private fun parseToRecord(record: NdefRecord): ParsedNdefRecord {

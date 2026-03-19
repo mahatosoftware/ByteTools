@@ -128,6 +128,17 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        val automationFromIntentMessages = NfcUtils.getParsedNdefRecords(
+            intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)
+        )
+            .firstOrNull { it.type == RecordType.AUTOMATION }
+            ?.data
+
+        if (!automationFromIntentMessages.isNullOrBlank() && automationFromIntentMessages != lastAutomationRun) {
+            pendingAutomationRun = automationFromIntentMessages
+            return
+        }
+
         if (intent.action !in listOf(
                 NfcAdapter.ACTION_TAG_DISCOVERED,
                 NfcAdapter.ACTION_TECH_DISCOVERED,
