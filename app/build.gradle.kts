@@ -17,8 +17,8 @@ android {
         applicationId = "in.mahato.bytetools"
         minSdk = 24
         targetSdk = 35
-        versionCode = 28
-        versionName = "1.0.28"
+        versionCode = 29
+        versionName = "1.0.29"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -26,7 +26,7 @@ android {
         }
     }
 
-    aaptOptions {
+    androidResources {
         ignoreAssetsPattern = "!.DS_Store:!._*"
     }
 
@@ -55,18 +55,20 @@ android {
     buildTypes {
         debug {
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713" // Test ID
-            buildConfigField("String", "AD_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
-            buildConfigField("String", "AD_BANNER_ID", "\"ca-app-pub-3940256099942544/6300978111\"")
-            buildConfigField("String", "AD_NATIVE_ID", "\"ca-app-pub-3940256099942544/2247696110\"")
+            buildConfigField("String", "AD_PDF_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("String", "AD_IMAGE_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("String", "AD_GPS_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("String", "AD_QR_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             // TODO: Replace these with your actual AdMob IDs before publishing to the Play Store
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713" // Test ID
-            buildConfigField("String", "AD_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
-            buildConfigField("String", "AD_BANNER_ID", "\"ca-app-pub-3940256099942544/6300978111\"")
-            buildConfigField("String", "AD_NATIVE_ID", "\"ca-app-pub-3940256099942544/2247696110\"")
+            buildConfigField("String", "AD_PDF_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("String", "AD_IMAGE_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("String", "AD_GPS_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("String", "AD_QR_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -75,17 +77,21 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
     }
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {
