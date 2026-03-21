@@ -17,8 +17,8 @@ android {
         applicationId = "in.mahato.bytetools"
         minSdk = 24
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.0.24"
+        versionCode = 28
+        versionName = "1.0.28"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -36,6 +36,9 @@ android {
             excludes += "**/libimage_processing_util_jni.so"
             excludes += "**/libdatastore_shared_counter.so"
             pickFirsts.add("**/libjpeg.so")
+        }
+        dex {
+            useLegacyPackaging = false
         }
         resources {
             excludes += "**/._*"
