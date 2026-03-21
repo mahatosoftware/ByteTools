@@ -11,38 +11,56 @@ import javax.inject.Singleton
 @Singleton
 class AdManager @Inject constructor() {
 
-    private var interstitialAd: InterstitialAd? = null
+    private val interstitialAds = mutableMapOf<String, InterstitialAd?>()
+    private var adsShownCount = 0
+    private val MAX_ADS_PER_SESSION = 2
 
     fun initialize(context: Context) {
         MobileAds.initialize(context) {}
+        // Pre-load common ones
+        loadInterstitial(context, AdsConfig.PDF_INTERSTITIAL_ID)
+        loadInterstitial(context, AdsConfig.IMAGE_INTERSTITIAL_ID)
+        loadInterstitial(context, AdsConfig.GPS_INTERSTITIAL_ID)
+        loadInterstitial(context, AdsConfig.QR_INTERSTITIAL_ID)
     }
 
-    fun loadInterstitial(context: Context, adUnitId: String = AdsConfig.INTERSTITIAL_ID) {
-        if (!AdsConfig.isAdsEnabled) return
+    fun loadInterstitial(context: Context, adUnitId: String) {
+        if (!AdsConfig.isAdsEnabled || adsShownCount >= MAX_ADS_PER_SESSION) return
         val adRequest = AdRequest.Builder().build()
         InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(ad: InterstitialAd) {
-                interstitialAd = ad
+                interstitialAds[adUnitId] = ad
             }
 
             override fun onAdFailedToLoad(error: LoadAdError) {
-                interstitialAd = null
+                interstitialAds[adUnitId] = null
             }
         })
     }
 
-    fun showInterstitial(activity: Activity, onAdDismissed: () -> Unit) {
-        if (interstitialAd != null) {
-            interstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
+    fun showInterstitial(activity: Activity, adUnitId: String, onAdDismissed: () -> Unit) {
+        val ad = interstitialAds[adUnitId]
+        if (adsShownCount < MAX_ADS_PER_SESSION && ad != null) {
+            ad.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
-                    interstitialAd = null
+                    interstitialAds[adUnitId] = null
+                    adsShownCount++
                     onAdDismissed()
-                    loadInterstitial(activity)
+                    loadInterstitial(activity, adUnitId)
+                }
+                
+                override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                    interstitialAds[adUnitId] = null
+                    onAdDismissed()
                 }
             }
-            interstitialAd?.show(activity)
+            ad.show(activity)
         } else {
             onAdDismissed()
+            // If ad was null but we still have budget, try to load it for next time
+            if (ad == null && adsShownCount < MAX_ADS_PER_SESSION) {
+                loadInterstitial(activity, adUnitId)
+            }
         }
     }
 }

@@ -30,6 +30,7 @@ import `in`.mahato.bytetools.nfc.NfcAutomationExecutor
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import `in`.mahato.bytetools.utils.AdManager
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -40,11 +41,15 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var nfcManager: NfcManager
 
+    @Inject
+    lateinit var adManager: AdManager
+
     private var lastAutomationRun: String? = null
     private var pendingAutomationRun: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        adManager.initialize(this)
         nfcViewModel
         scheduleNfcIntentHandling(intent)
 

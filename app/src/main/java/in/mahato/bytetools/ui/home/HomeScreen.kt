@@ -1,5 +1,7 @@
 package `in`.mahato.bytetools.ui.home
 
+import android.app.Activity
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -224,13 +226,59 @@ fun CategoryGrid(navController: NavController, viewModel: HomeViewModel) {
         for (i in categories.indices step 2) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 CategoryCard(categories[i], modifier = Modifier.weight(1f)) {
-                    viewModel.addRecentTool(categories[i].route)
-                    navController.navigate(categories[i].route)
+                    val activity = context as? Activity
+                    val route = categories[i].route
+                    val adRoutes = listOf(
+                        Screen.GPSDashboard.route,
+                        Screen.ImageDashboard.route,
+                        Screen.QRBarcodeDashboard.route,
+                        Screen.PDFDashboard.route
+                    )
+
+                    if (activity != null && route in adRoutes) {
+                        val adId = when (route) {
+                            Screen.PDFDashboard.route -> `in`.mahato.bytetools.utils.AdsConfig.PDF_INTERSTITIAL_ID
+                            Screen.ImageDashboard.route -> `in`.mahato.bytetools.utils.AdsConfig.IMAGE_INTERSTITIAL_ID
+                            Screen.GPSDashboard.route -> `in`.mahato.bytetools.utils.AdsConfig.GPS_INTERSTITIAL_ID
+                            Screen.QRBarcodeDashboard.route -> `in`.mahato.bytetools.utils.AdsConfig.QR_INTERSTITIAL_ID
+                            else -> `in`.mahato.bytetools.utils.AdsConfig.QR_INTERSTITIAL_ID
+                        }
+                        viewModel.adManager.showInterstitial(activity, adId) {
+                            viewModel.addRecentTool(route)
+                            navController.navigate(route)
+                        }
+                    } else {
+                        viewModel.addRecentTool(route)
+                        navController.navigate(route)
+                    }
                 }
                 if (i + 1 < categories.size) {
                     CategoryCard(categories[i+1], modifier = Modifier.weight(1f)) {
-                        viewModel.addRecentTool(categories[i+1].route)
-                        navController.navigate(categories[i+1].route)
+                        val activity = context as? Activity
+                        val route = categories[i+1].route
+                        val adRoutes = listOf(
+                            Screen.GPSDashboard.route,
+                            Screen.ImageDashboard.route,
+                            Screen.QRBarcodeDashboard.route,
+                            Screen.PDFDashboard.route
+                        )
+
+                        if (activity != null && route in adRoutes) {
+                            val adId = when (route) {
+                                Screen.PDFDashboard.route -> `in`.mahato.bytetools.utils.AdsConfig.PDF_INTERSTITIAL_ID
+                                Screen.ImageDashboard.route -> `in`.mahato.bytetools.utils.AdsConfig.IMAGE_INTERSTITIAL_ID
+                                Screen.GPSDashboard.route -> `in`.mahato.bytetools.utils.AdsConfig.GPS_INTERSTITIAL_ID
+                                Screen.QRBarcodeDashboard.route -> `in`.mahato.bytetools.utils.AdsConfig.QR_INTERSTITIAL_ID
+                                else -> `in`.mahato.bytetools.utils.AdsConfig.QR_INTERSTITIAL_ID
+                            }
+                            viewModel.adManager.showInterstitial(activity, adId) {
+                                viewModel.addRecentTool(route)
+                                navController.navigate(route)
+                            }
+                        } else {
+                            viewModel.addRecentTool(route)
+                            navController.navigate(route)
+                        }
                     }
                 } else {
                     Spacer(modifier = Modifier.weight(1f))

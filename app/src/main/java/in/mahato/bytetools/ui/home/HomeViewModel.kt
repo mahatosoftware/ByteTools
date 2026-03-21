@@ -10,11 +10,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import `in`.mahato.bytetools.utils.AdManager
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val preferenceManager: PreferenceManager
+    private val preferenceManager: PreferenceManager,
+    val adManager: AdManager
 ) : ViewModel() {
 
     val recentTools: StateFlow<List<String>> = preferenceManager.recentToolsFlow
