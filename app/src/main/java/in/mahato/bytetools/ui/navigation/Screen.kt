@@ -63,6 +63,7 @@ sealed class Screen(val route: String, val title: String) {
     object ImageMetadata : Screen("image_metadata", "Image Metadata")
     object ImageToPdf : Screen("image_to_pdf", "Image to PDF")
     object ImageGallery : Screen("image_gallery", "Gallery")
+    object ImageScanner : Screen("image_scanner", "Scan Document")
     object FullScreenImage : Screen("full_screen_image", "Image Viewer")
 
     // Group 10: PDF Tools

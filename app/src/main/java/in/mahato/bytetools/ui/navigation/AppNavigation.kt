@@ -124,6 +124,7 @@ fun AppNavigation(
         composable(Screen.ImageMetadata.route) { ImageMetadataScreen(navController) }
         composable(Screen.ImageToPdf.route) { ImageToPdfScreen(navController) }
         composable(Screen.ImageGallery.route) { ImageGalleryScreen(navController) }
+        composable(Screen.ImageScanner.route) { ImageScannerScreen(navController) }
         composable(
             route = Screen.FullScreenImage.route + "?uri={uri}",
             arguments = listOf(navArgument("uri") { type = NavType.StringType })

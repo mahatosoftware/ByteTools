@@ -41,7 +41,8 @@ fun ImageToolsDashboardScreen(navController: NavController) {
 
         ImageToolItem("Metadata", "View EXIF details", Icons.Default.Info, Screen.ImageMetadata.route, Color(0xFFFFF3E0), Color(0xFFFF9800)),
         ImageToolItem("To PDF", "Convert images to PDF", Icons.Default.PictureAsPdf, Screen.ImageToPdf.route, Color(0xFFF1F8E9), Color(0xFF8BC34A)),
-        ImageToolItem("Gallery", "Manage saved media", Icons.Default.Collections, Screen.ImageGallery.route, Color(0xFFE0F7FA), Color(0xFF00BCD4))
+        ImageToolItem("Gallery", "Manage saved media", Icons.Default.Collections, Screen.ImageGallery.route, Color(0xFFE0F7FA), Color(0xFF00BCD4)),
+        ImageToolItem("Scanner", "Scan paper to images", Icons.Default.DocumentScanner, Screen.ImageScanner.route, Color(0xFFFDEEF4), Color(0xFFE91E63))
     )
 
     Scaffold(

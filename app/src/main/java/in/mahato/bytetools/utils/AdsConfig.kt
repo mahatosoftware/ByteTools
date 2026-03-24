@@ -16,4 +16,7 @@ object AdsConfig {
     
     // Global toggle for ads (can be used to disable ads for Pro users)
     var isAdsEnabled = true
+    
+    // Limits
+    const val MAX_ADS_PER_SESSION = 1
 }
