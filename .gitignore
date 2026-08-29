@@ -4,6 +4,7 @@ build/
 
 # Local configuration file (SDK path etc)
 local.properties
+key.properties
 
 # Android Studio
 .idea/

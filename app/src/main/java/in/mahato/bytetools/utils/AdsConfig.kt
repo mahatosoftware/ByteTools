@@ -17,6 +17,8 @@ object AdsConfig {
     // Global toggle for ads (can be used to disable ads for Pro users)
     var isAdsEnabled = true
     
-    // Limits
-    const val MAX_ADS_PER_SESSION = 1
+    // Daily ad limits
+    const val MAX_ADS_PER_DAY = 1
+    @Deprecated("Use MAX_ADS_PER_DAY instead", ReplaceWith("MAX_ADS_PER_DAY"))
+    const val MAX_ADS_PER_SESSION = MAX_ADS_PER_DAY
 }

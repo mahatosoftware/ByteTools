@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -7,7 +10,7 @@ plugins {
 
 android {
     namespace = "in.mahato.bytetools"
-    compileSdk = 35
+    compileSdk = 36
 
     // Crucial: Redirect build files to local drive to prevent macOS "._*" 
     // metadata files from being created on the external drive, which crashes the build.
@@ -16,9 +19,9 @@ android {
     defaultConfig {
         applicationId = "in.mahato.bytetools"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 29
-        versionName = "1.0.29"
+        targetSdk = 36
+        versionCode = 30
+        versionName = "1.0.30"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -52,6 +55,43 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        create("release") {
+            val keyPropsFile = rootProject.file("key.properties").takeIf { it.exists() }
+                ?: file("key.properties").takeIf { it.exists() }
+
+            if (keyPropsFile != null) {
+                val keyProps = Properties().apply {
+                    load(FileInputStream(keyPropsFile))
+                }
+                val storePath = keyProps.getProperty("storeFile")
+                    ?: keyProps.getProperty("storeFilePath")
+                    ?: keyProps.getProperty("KEYSTORE_FILE_PATH")
+
+                val kFile = storePath?.let { file(it) }
+
+                if (kFile != null && kFile.exists()) {
+                    storeFile = kFile
+                    storePassword = keyProps.getProperty("storePassword") ?: keyProps.getProperty("KEYSTORE_PASSWORD")
+                    keyAlias = keyProps.getProperty("keyAlias") ?: keyProps.getProperty("KEY_ALIAS")
+                    keyPassword = keyProps.getProperty("keyPassword") ?: keyProps.getProperty("KEY_PASSWORD")
+                }
+            } else {
+                val ksFile = providers.gradleProperty("KEYSTORE_FILE_PATH").orNull
+                val ksPass = providers.gradleProperty("KEYSTORE_PASSWORD").orNull
+                val kAlias = providers.gradleProperty("KEY_ALIAS").orNull
+                val kPass = providers.gradleProperty("KEY_PASSWORD").orNull
+
+                if (!ksFile.isNullOrEmpty() && file(ksFile).exists()) {
+                    storeFile = file(ksFile)
+                    storePassword = ksPass
+                    keyAlias = kAlias
+                    keyPassword = kPass
+                }
+            }
+        }
+    }
+
     buildTypes {
         debug {
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713" // Test ID
@@ -61,6 +101,10 @@ android {
             buildConfigField("String", "AD_QR_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
         }
         release {
+            val releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning?.storeFile != null) {
+                signingConfig = releaseSigning
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             // TODO: Replace these with your actual AdMob IDs before publishing to the Play Store
@@ -77,12 +121,12 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
 
     composeOptions {
@@ -155,6 +199,7 @@ dependencies {
     implementation(libs.pdfbox.android)
     implementation(libs.tesseract.android)
     implementation(libs.android.pdf.viewer)
+    implementation(libs.billing)
     implementation(libs.billing.ktx)
 
     testImplementation(libs.junit)
