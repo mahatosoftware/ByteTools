@@ -26,6 +26,5 @@
 - [ ] Secure API keys in `local.properties` or BuildConfigs.
 
 ## 💰 Monetization
-- [x] Integrate Google Play Billing SDK.
 - [x] Integrate AdMob SDK for banners and interstitials.
 - [x] Implement Pro gating logic for premium features.

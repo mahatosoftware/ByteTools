@@ -76,6 +76,7 @@ sealed class Screen(val route: String, val title: String) {
     object PDFWatermark : Screen("pdf_watermark", "PDF Watermark")
     object PDFRedact : Screen("pdf_redact", "Redact PDF")
     object PDFOCR : Screen("pdf_ocr", "OCR PDF")
+    object PDFRemovePassword : Screen("pdf_remove_password", "Remove Password")
     object PDFHistory : Screen("pdf_history", "PDF History")
 
     // Group 11: NFC Tools
@@ -91,4 +92,12 @@ sealed class Screen(val route: String, val title: String) {
     object NFCQRHybrid : Screen("nfc_qr_hybrid", "QR & NFC Share")
     object NFCTapCounter : Screen("nfc_tap_counter", "Tap Counter")
     object NFCScannerHistory : Screen("nfc_scanner_history", "NFC Scanner History")
+
+    // Group 12: Network & Connectivity Tools
+    object NetworkDashboard : Screen("network_dashboard", "Network Tools")
+    object LanScanner : Screen("lan_scanner", "WiFi / LAN Scanner")
+    object PingTester : Screen("ping_tester", "Ping & Latency")
+    object NetworkInfo : Screen("network_info", "Network & ISP Info")
+    object PortScanner : Screen("port_scanner", "Port Scanner")
+    object DnsLookup : Screen("dns_lookup", "DNS & WHOIS")
 }

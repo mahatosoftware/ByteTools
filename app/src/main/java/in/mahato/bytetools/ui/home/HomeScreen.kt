@@ -215,6 +215,7 @@ fun CategoryGrid(navController: NavController, viewModel: HomeViewModel) {
         CategoryItem("QR & Barcode", "Scan & Generate", Icons.Default.QrCode, Screen.QRBarcodeDashboard.route, Color(0xFFE8F5E9), Color(0xFF4CAF50)),
         CategoryItem("PDF Tools", "View, Merge, Split", Icons.Default.PictureAsPdf, Screen.PDFDashboard.route, Color(0xFFFBE9E7), Color(0xFFFF5722)),
         CategoryItem("Fun Tools", "Games & Decisions", Icons.Default.Nightlife, Screen.DecisionDashboard.route, Color(0xFFFFF3E0), Color(0xFFFF9800)),
+        CategoryItem("Network Tools", "WiFi & Diagnostics", Icons.Default.Wifi, Screen.NetworkDashboard.route, Color(0xFFE0F2F1), Color(0xFF009688)),
         CategoryItem("Utility", "Math & Converters", Icons.Default.Construction, Screen.Tools.route, Color(0xFFF1F8E9), Color(0xFF8BC34A))
     ).apply {
         if (hasNfc) {
@@ -366,6 +367,7 @@ fun getToolNameFromRoute(route: String): String {
         Screen.DecisionDashboard.route -> "Fun Tools"
         Screen.Tools.route -> "Utility"
         Screen.NFCDashboard.route -> "NFC Tools"
+        Screen.NetworkDashboard.route -> "Network Tools"
         // add more specific routes as needed based on the AppNavigation map
         else -> ""
     }
@@ -384,6 +386,7 @@ fun getIconForRoute(route: String): ImageVector? {
         Screen.DecisionDashboard.route -> Icons.Default.Nightlife
         Screen.Tools.route -> Icons.Default.Construction
         Screen.NFCDashboard.route -> Icons.Default.Nfc
+        Screen.NetworkDashboard.route -> Icons.Default.Wifi
         else -> null
     }
 }

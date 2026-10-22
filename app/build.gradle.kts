@@ -1,6 +1,3 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -12,16 +9,15 @@ android {
     namespace = "in.mahato.bytetools"
     compileSdk = 36
 
-    // Crucial: Redirect build files to local drive to prevent macOS "._*" 
-    // metadata files from being created on the external drive, which crashes the build.
-    layout.buildDirectory.set(file("/Users/debasish/AndroidBuilds/ByteTools/app"))
+    // Redirect build files to local drive if needed (can be uncommented for CLI builds)
+    // layout.buildDirectory.set(file("/Users/debasish/AndroidBuilds/ByteTools/app"))
 
     defaultConfig {
         applicationId = "in.mahato.bytetools"
         minSdk = 24
         targetSdk = 36
-        versionCode = 30
-        versionName = "1.0.30"
+        versionCode = 32
+        versionName = "1.0.32"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -55,43 +51,6 @@ android {
         buildConfig = true
     }
 
-    signingConfigs {
-        create("release") {
-            val keyPropsFile = rootProject.file("key.properties").takeIf { it.exists() }
-                ?: file("key.properties").takeIf { it.exists() }
-
-            if (keyPropsFile != null) {
-                val keyProps = Properties().apply {
-                    load(FileInputStream(keyPropsFile))
-                }
-                val storePath = keyProps.getProperty("storeFile")
-                    ?: keyProps.getProperty("storeFilePath")
-                    ?: keyProps.getProperty("KEYSTORE_FILE_PATH")
-
-                val kFile = storePath?.let { file(it) }
-
-                if (kFile != null && kFile.exists()) {
-                    storeFile = kFile
-                    storePassword = keyProps.getProperty("storePassword") ?: keyProps.getProperty("KEYSTORE_PASSWORD")
-                    keyAlias = keyProps.getProperty("keyAlias") ?: keyProps.getProperty("KEY_ALIAS")
-                    keyPassword = keyProps.getProperty("keyPassword") ?: keyProps.getProperty("KEY_PASSWORD")
-                }
-            } else {
-                val ksFile = providers.gradleProperty("KEYSTORE_FILE_PATH").orNull
-                val ksPass = providers.gradleProperty("KEYSTORE_PASSWORD").orNull
-                val kAlias = providers.gradleProperty("KEY_ALIAS").orNull
-                val kPass = providers.gradleProperty("KEY_PASSWORD").orNull
-
-                if (!ksFile.isNullOrEmpty() && file(ksFile).exists()) {
-                    storeFile = file(ksFile)
-                    storePassword = ksPass
-                    keyAlias = kAlias
-                    keyPassword = kPass
-                }
-            }
-        }
-    }
-
     buildTypes {
         debug {
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713" // Test ID
@@ -101,18 +60,14 @@ android {
             buildConfigField("String", "AD_QR_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
         }
         release {
-            val releaseSigning = signingConfigs.findByName("release")
-            if (releaseSigning?.storeFile != null) {
-                signingConfig = releaseSigning
-            }
             isMinifyEnabled = true
             isShrinkResources = true
             // TODO: Replace these with your actual AdMob IDs before publishing to the Play Store
-            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713" // Test ID
-            buildConfigField("String", "AD_PDF_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
-            buildConfigField("String", "AD_IMAGE_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
-            buildConfigField("String", "AD_GPS_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
-            buildConfigField("String", "AD_QR_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-8382655413286804~1272846618" // Test ID
+            buildConfigField("String", "AD_PDF_INTERSTITIAL_ID", "\"ca-app-pub-8382655413286804/6027313993\"")
+            buildConfigField("String", "AD_IMAGE_INTERSTITIAL_ID", "\"ca-app-pub-8382655413286804/8278339712\"")
+            buildConfigField("String", "AD_GPS_INTERSTITIAL_ID", "\"ca-app-pub-8382655413286804/5694606658\"")
+            buildConfigField("String", "AD_QR_INTERSTITIAL_ID", "\"ca-app-pub-8382655413286804/3401150656\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -132,10 +87,6 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
-}
-
-kotlin {
-    jvmToolchain(17)
 }
 
 dependencies {
@@ -199,8 +150,6 @@ dependencies {
     implementation(libs.pdfbox.android)
     implementation(libs.tesseract.android)
     implementation(libs.android.pdf.viewer)
-    implementation(libs.billing)
-    implementation(libs.billing.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

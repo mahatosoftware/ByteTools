@@ -51,6 +51,7 @@ import `in`.mahato.bytetools.ui.tools.pdf.*
 import `in`.mahato.bytetools.ui.tools.image.*
 import `in`.mahato.bytetools.ui.tools.image.ImageViewerScreen
 import `in`.mahato.bytetools.ui.tools.nfc.*
+import `in`.mahato.bytetools.ui.tools.network.*
 
 @Composable
 fun AppNavigation(
@@ -153,6 +154,7 @@ fun AppNavigation(
         composable(Screen.PDFWatermark.route) { PDFWatermarkScreen(navController) }
         composable(Screen.PDFRedact.route) { PDFRedactScreen(navController) }
         composable(Screen.PDFOCR.route) { PDFOCRScreen(navController) }
+        composable(Screen.PDFRemovePassword.route) { PDFRemovePasswordScreen(navController) }
         composable(Screen.PDFHistory.route) { PDFHistoryScreen(navController) }
 
         // Group 11: NFC Tools
@@ -168,5 +170,13 @@ fun AppNavigation(
         composable(Screen.NFCQRHybrid.route) { NFCQRHybridScreen(navController) }
         composable(Screen.NFCTapCounter.route) { NFCTapCounterScreen(navController) }
         composable(Screen.NFCScannerHistory.route) { NFCScannerHistoryScreen(navController) }
+
+        // Group 12: Network & Connectivity Tools
+        composable(Screen.NetworkDashboard.route) { NetworkDashboardScreen(navController) }
+        composable(Screen.LanScanner.route) { LanScannerScreen(navController) }
+        composable(Screen.PingTester.route) { PingTesterScreen(navController) }
+        composable(Screen.NetworkInfo.route) { NetworkInfoScreen(navController) }
+        composable(Screen.PortScanner.route) { PortScannerScreen(navController) }
+        composable(Screen.DnsLookup.route) { DnsLookupScreen(navController) }
     }
 }

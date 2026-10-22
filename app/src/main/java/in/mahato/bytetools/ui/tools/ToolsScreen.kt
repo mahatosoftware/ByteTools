@@ -59,6 +59,13 @@ fun ToolsScreen(navController: NavController) {
             ToolItem("Storage Analyzer", "Manage storage space", Icons.Default.Storage, Screen.StorageAnalyzer.route, "Device", Color(0xFFECEFF1), Color(0xFF607D8B)),
             ToolItem("RAM Monitor", "Real-time RAM usage", Icons.Default.Memory, Screen.RAMMonitor.route, "Device", Color(0xFFE3F2FD), Color(0xFF2196F3)),
             ToolItem("Device Info", "Detailed hardware info", Icons.Default.Info, Screen.DeviceInfo.route, "Device", Color(0xFFF3E5F5), Color(0xFF9C27B0))
+        )),
+        ToolGroup("Network Tools", "WiFi & network diagnostics", listOf(
+            ToolItem("LAN Scanner", "Find devices on WiFi", Icons.Default.Devices, Screen.LanScanner.route, "Network", Color(0xFFE0F2F1), Color(0xFF009688)),
+            ToolItem("Ping Tester", "Test latency & jitter", Icons.Default.Speed, Screen.PingTester.route, "Network", Color(0xFFE8F5E9), Color(0xFF4CAF50)),
+            ToolItem("Network Info", "IP, gateway & WiFi dBm", Icons.Default.Info, Screen.NetworkInfo.route, "Network", Color(0xFFE3F2FD), Color(0xFF2196F3)),
+            ToolItem("Port Scanner", "Scan open network ports", Icons.Default.Security, Screen.PortScanner.route, "Network", Color(0xFFFFF3E0), Color(0xFFFF9800)),
+            ToolItem("DNS & WHOIS", "Lookup domain & DNS records", Icons.Default.Dns, Screen.DnsLookup.route, "Network", Color(0xFFF3E5F5), Color(0xFF9C27B0))
         ))
     )
 

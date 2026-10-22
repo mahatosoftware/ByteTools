@@ -20,7 +20,6 @@
 
 ## 💰 Monetization
 - [ ] Link AdMob app to the Play Store listing.
-- [ ] Verify Google Play Billing integration in a closed testing track.
 
 ## 🧪 Testing
 - [ ] Run internal testing with a few users.

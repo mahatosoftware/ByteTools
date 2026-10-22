@@ -42,6 +42,7 @@ fun PDFDashboardScreen(navController: NavController) {
         PDFToolItem("Watermark", "Add or remove text/image", Icons.Default.WaterDrop, Screen.PDFWatermark.route, Color(0xFFF1F8E9), Color(0xFF8BC34A)),
         PDFToolItem("Redact", "Hide area from PDF", Icons.Default.HighlightAlt, Screen.PDFRedact.route, Color(0xFFE0F7FA), Color(0xFF00BCD4)),
         PDFToolItem("OCR PDF", "Extract text from pages", Icons.Default.Scanner, Screen.PDFOCR.route, Color(0xFFFFEBEE), Color(0xFFF44336)),
+        PDFToolItem("Unlock PDF", "Remove PDF password", Icons.Default.LockOpen, Screen.PDFRemovePassword.route, Color(0xFFEDE7F6), Color(0xFF673AB7)),
         PDFToolItem("Img to PDF", "Convert images", Icons.Default.PictureAsPdf, Screen.ImageToPdf.route, Color(0xFFE8EAF6), Color(0xFF3F51B5)),
         PDFToolItem("History", "Managed transformed PDFs", Icons.Default.History, Screen.PDFHistory.route, Color(0xFFFFF8E1), Color(0xFFFFC107))
     )

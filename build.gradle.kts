@@ -7,4 +7,4 @@ plugins {
 }
 
 // Redirect build files to local drive to avoid macOS "._*" issues on external drives
-layout.buildDirectory.set(file("/Users/debasish/AndroidBuilds/ByteTools/root"))
+// layout.buildDirectory.set(file("/Users/debasish/AndroidBuilds/ByteTools/root"))
