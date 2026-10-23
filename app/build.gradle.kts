@@ -16,8 +16,8 @@ android {
         applicationId = "in.mahato.bytetools"
         minSdk = 24
         targetSdk = 36
-        versionCode = 32
-        versionName = "1.0.32"
+        versionCode = 34
+        versionName = "1.0.34"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -62,8 +62,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // TODO: Replace these with your actual AdMob IDs before publishing to the Play Store
-            manifestPlaceholders["admobAppId"] = "ca-app-pub-8382655413286804~1272846618" // Test ID
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-8382655413286804~1272846618" // Production AdMob App ID
             buildConfigField("String", "AD_PDF_INTERSTITIAL_ID", "\"ca-app-pub-8382655413286804/6027313993\"")
             buildConfigField("String", "AD_IMAGE_INTERSTITIAL_ID", "\"ca-app-pub-8382655413286804/8278339712\"")
             buildConfigField("String", "AD_GPS_INTERSTITIAL_ID", "\"ca-app-pub-8382655413286804/5694606658\"")

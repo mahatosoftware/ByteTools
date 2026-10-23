@@ -100,4 +100,15 @@ sealed class Screen(val route: String, val title: String) {
     object NetworkInfo : Screen("network_info", "Network & ISP Info")
     object PortScanner : Screen("port_scanner", "Port Scanner")
     object DnsLookup : Screen("dns_lookup", "DNS & WHOIS")
+
+    // Group 13: Audio Tools
+    object AudioDashboard : Screen("audio_dashboard", "Audio Tools")
+    object AudioConverter : Screen("audio_converter", "Audio Converter")
+    object AudioCutter : Screen("audio_cutter", "Audio Cutter")
+    object AudioMerger : Screen("audio_merger", "Audio Merger")
+    object AudioCompressor : Screen("audio_compressor", "Audio Compressor")
+    object VideoToAudio : Screen("video_to_audio", "Video to MP3")
+    object RingtoneMaker : Screen("ringtone_maker", "Ringtone Maker")
+    object AudioRecorder : Screen("audio_recorder", "Audio Recorder")
+    object AudioHistory : Screen("audio_history", "Audio History")
 }

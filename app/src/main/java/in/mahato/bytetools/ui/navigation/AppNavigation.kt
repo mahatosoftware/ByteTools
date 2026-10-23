@@ -52,6 +52,7 @@ import `in`.mahato.bytetools.ui.tools.image.*
 import `in`.mahato.bytetools.ui.tools.image.ImageViewerScreen
 import `in`.mahato.bytetools.ui.tools.nfc.*
 import `in`.mahato.bytetools.ui.tools.network.*
+import `in`.mahato.bytetools.ui.tools.audio.*
 
 @Composable
 fun AppNavigation(
@@ -178,5 +179,16 @@ fun AppNavigation(
         composable(Screen.NetworkInfo.route) { NetworkInfoScreen(navController) }
         composable(Screen.PortScanner.route) { PortScannerScreen(navController) }
         composable(Screen.DnsLookup.route) { DnsLookupScreen(navController) }
+
+        // Group 13: Audio Tools
+        composable(Screen.AudioDashboard.route) { AudioDashboardScreen(navController) }
+        composable(Screen.AudioConverter.route) { AudioConverterScreen(navController) }
+        composable(Screen.AudioCutter.route) { AudioCutterScreen(navController) }
+        composable(Screen.AudioMerger.route) { AudioMergerScreen(navController) }
+        composable(Screen.AudioCompressor.route) { AudioCompressorScreen(navController) }
+        composable(Screen.VideoToAudio.route) { VideoToAudioScreen(navController) }
+        composable(Screen.RingtoneMaker.route) { RingtoneMakerScreen(navController) }
+        composable(Screen.AudioRecorder.route) { AudioRecorderScreen(navController) }
+        composable(Screen.AudioHistory.route) { AudioHistoryScreen(navController) }
     }
 }

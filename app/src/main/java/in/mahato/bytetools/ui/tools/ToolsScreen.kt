@@ -66,6 +66,16 @@ fun ToolsScreen(navController: NavController) {
             ToolItem("Network Info", "IP, gateway & WiFi dBm", Icons.Default.Info, Screen.NetworkInfo.route, "Network", Color(0xFFE3F2FD), Color(0xFF2196F3)),
             ToolItem("Port Scanner", "Scan open network ports", Icons.Default.Security, Screen.PortScanner.route, "Network", Color(0xFFFFF3E0), Color(0xFFFF9800)),
             ToolItem("DNS & WHOIS", "Lookup domain & DNS records", Icons.Default.Dns, Screen.DnsLookup.route, "Network", Color(0xFFF3E5F5), Color(0xFF9C27B0))
+        )),
+        ToolGroup("Audio Tools", "Cut, convert & compress audio", listOf(
+            ToolItem("Audio Converter", "Convert WAV, M4A to MP3", Icons.Default.Transform, Screen.AudioConverter.route, "Audio", Color(0xFFFCE4EC), Color(0xFFE91E63)),
+            ToolItem("Audio Cutter", "Trim audio & sound clips", Icons.Default.ContentCut, Screen.AudioCutter.route, "Audio", Color(0xFFEDE7F6), Color(0xFF673AB7)),
+            ToolItem("Ringtone Maker", "Create & set ringtones", Icons.Default.NotificationsActive, Screen.RingtoneMaker.route, "Audio", Color(0xFFFFF8E1), Color(0xFFFFB300)),
+            ToolItem("Audio Recorder", "Record voice & audio notes", Icons.Default.Mic, Screen.AudioRecorder.route, "Audio", Color(0xFFFFEBEE), Color(0xFFE53935)),
+            ToolItem("Audio Merger", "Combine multiple songs", Icons.Default.Merge, Screen.AudioMerger.route, "Audio", Color(0xFFE3F2FD), Color(0xFF2196F3)),
+            ToolItem("Audio Compressor", "Reduce audio file size", Icons.Default.Compress, Screen.AudioCompressor.route, "Audio", Color(0xFFE8F5E9), Color(0xFF4CAF50)),
+            ToolItem("Video to MP3", "Extract audio from video", Icons.Default.VideoFile, Screen.VideoToAudio.route, "Audio", Color(0xFFFFF3E0), Color(0xFFFF9800)),
+            ToolItem("Audio History", "Manage saved audio files", Icons.Default.History, Screen.AudioHistory.route, "Audio", Color(0xFFF1F8E9), Color(0xFF8BC34A))
         ))
     )
 
