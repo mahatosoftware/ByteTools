@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -42,6 +43,7 @@ fun ToolsScreen(navController: NavController) {
     
     val allGroups = listOf(
         ToolGroup("Daily Essentials", "Quick daily shortcuts", listOf(
+            ToolItem("Group Shopping with Smart Split", "Group shopping & bills", Icons.Default.ShoppingCart, Screen.QuickOrderDashboard.route, "Productivity", Color(0xFFEDE7F6), Color(0xFF673AB7)),
             ToolItem("Flashlight", "Quick light access", Icons.Default.FlashlightOn, Screen.Flashlight.route, "Quick", Color(0xFFE3F2FD), Color(0xFF2196F3)),
             ToolItem("Magnifier", "Zoom in on small text", Icons.Default.ZoomIn, Screen.Magnifier.route, "Quick", Color(0xFFF3E5F5), Color(0xFF9C27B0)),
             ToolItem("Direct WhatsApp", "Direct message anyone", Icons.Default.Chat, Screen.DirectWhatsApp.route, "Quick", Color(0xFFE8F5E9), Color(0xFF4CAF50)),
@@ -258,13 +260,15 @@ fun ToolCard(item: ToolItem, onClick: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
-                    maxLines = 1
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = item.description,
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Gray,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

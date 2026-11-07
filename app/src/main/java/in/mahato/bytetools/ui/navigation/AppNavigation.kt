@@ -53,6 +53,8 @@ import `in`.mahato.bytetools.ui.tools.image.ImageViewerScreen
 import `in`.mahato.bytetools.ui.tools.nfc.*
 import `in`.mahato.bytetools.ui.tools.network.*
 import `in`.mahato.bytetools.ui.tools.audio.*
+import androidx.hilt.navigation.compose.hiltViewModel
+import `in`.mahato.bytetools.ui.tools.quickorder.ui.*
 
 @Composable
 fun AppNavigation(
@@ -190,5 +192,63 @@ fun AppNavigation(
         composable(Screen.RingtoneMaker.route) { RingtoneMakerScreen(navController) }
         composable(Screen.AudioRecorder.route) { AudioRecorderScreen(navController) }
         composable(Screen.AudioHistory.route) { AudioHistoryScreen(navController) }
+
+        // Group 14: Group Shopping with Smart Split
+        composable(Screen.QuickOrderDashboard.route) {
+            val viewModel: QuickOrderViewModel = hiltViewModel()
+            QuickOrderDashboardScreen(navController, viewModel)
+        }
+        composable(Screen.CreateGroupOrder.route) {
+            val viewModel: QuickOrderViewModel = hiltViewModel()
+            CreateGroupOrderScreen(navController, viewModel)
+        }
+        composable(
+            route = "collect_orders/{orderId}",
+            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val viewModel: QuickOrderViewModel = hiltViewModel()
+            CollectOrdersScreen(orderId, navController, viewModel)
+        }
+        composable(
+            route = "consolidated_list/{orderId}",
+            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val viewModel: QuickOrderViewModel = hiltViewModel()
+            ConsolidatedListScreen(orderId, navController, viewModel)
+        }
+        composable(
+            route = "enter_bill/{orderId}",
+            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val viewModel: QuickOrderViewModel = hiltViewModel()
+            EnterBillScreen(orderId, navController, viewModel)
+        }
+        composable(
+            route = "reconciliation/{orderId}",
+            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val viewModel: QuickOrderViewModel = hiltViewModel()
+            ReconciliationScreen(orderId, navController, viewModel)
+        }
+        composable(
+            route = "settlement_dashboard/{orderId}",
+            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val viewModel: QuickOrderViewModel = hiltViewModel()
+            SettlementDashboardScreen(orderId, navController, viewModel)
+        }
+        composable(
+            route = "payment_tracking/{orderId}",
+            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val viewModel: QuickOrderViewModel = hiltViewModel()
+            PaymentTrackingScreen(orderId, navController, viewModel)
+        }
     }
 }

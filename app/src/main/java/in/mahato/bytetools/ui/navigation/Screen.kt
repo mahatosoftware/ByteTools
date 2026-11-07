@@ -111,4 +111,26 @@ sealed class Screen(val route: String, val title: String) {
     object RingtoneMaker : Screen("ringtone_maker", "Ringtone Maker")
     object AudioRecorder : Screen("audio_recorder", "Audio Recorder")
     object AudioHistory : Screen("audio_history", "Audio History")
+
+    // Group 14: Group Shopping with Smart Split
+    object QuickOrderDashboard : Screen("quick_order_dashboard", "Group Shopping with Smart Split")
+    object CreateGroupOrder : Screen("create_group_order", "Create Group Order")
+    object CollectOrders : Screen("collect_orders/{orderId}", "Collect Orders") {
+        fun createRoute(orderId: Long) = "collect_orders/$orderId"
+    }
+    object ConsolidatedList : Screen("consolidated_list/{orderId}", "Consolidated Shopping List") {
+        fun createRoute(orderId: Long) = "consolidated_list/$orderId"
+    }
+    object EnterBill : Screen("enter_bill/{orderId}", "Enter Final Bill") {
+        fun createRoute(orderId: Long) = "enter_bill/$orderId"
+    }
+    object Reconciliation : Screen("reconciliation/{orderId}", "Bill Reconciliation") {
+        fun createRoute(orderId: Long) = "reconciliation/$orderId"
+    }
+    object SettlementDashboard : Screen("settlement_dashboard/{orderId}", "Final Settlement") {
+        fun createRoute(orderId: Long) = "settlement_dashboard/$orderId"
+    }
+    object PaymentTracking : Screen("payment_tracking/{orderId}", "Payment Tracking") {
+        fun createRoute(orderId: Long) = "payment_tracking/$orderId"
+    }
 }

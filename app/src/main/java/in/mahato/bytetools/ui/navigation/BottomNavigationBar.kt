@@ -70,12 +70,22 @@ fun BottomNavigationBar(navController: NavController) {
                         .clip(RoundedCornerShape(12.dp))
                         .clickable {
                             if (currentRoute != item.screen.route) {
-                                navController.navigate(item.screen.route) {
-                                    popUpTo(navController.graph.startDestinationId) {
-                                        saveState = true
+                                if (item.screen == Screen.Home) {
+                                    val popped = navController.popBackStack(Screen.Home.route, inclusive = false)
+                                    if (!popped) {
+                                        navController.navigate(Screen.Home.route) {
+                                            popUpTo(Screen.Home.route) { inclusive = false }
+                                            launchSingleTop = true
+                                        }
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
+                                } else {
+                                    navController.navigate(item.screen.route) {
+                                        popUpTo(Screen.Home.route) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
                             }
                         },

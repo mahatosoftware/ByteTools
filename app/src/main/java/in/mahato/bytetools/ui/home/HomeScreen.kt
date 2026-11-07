@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import android.nfc.NfcAdapter
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -96,7 +97,80 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
             Spacer(modifier = Modifier.height(16.dp))
             QuickActionRow(navController, viewModel)
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Featured Utility: Group Shopping with Smart Split
+            Card(
+                onClick = {
+                    viewModel.addRecentTool(Screen.QuickOrderDashboard.route)
+                    navController.navigate(Screen.QuickOrderDashboard.route)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFEDE7F6)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF673AB7)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.ShoppingCart,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Group Shopping with Smart Split",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF311B92)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF673AB7)
+                            ) {
+                                Text(
+                                    "NEW",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Collect group orders, consolidate bills and split discounts fairly.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF512DA8),
+                            lineHeight = 16.sp
+                        )
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForwardIos,
+                        contentDescription = null,
+                        tint = Color(0xFF673AB7),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
 
             // 3. Main Tool Categories
             Text(
@@ -210,6 +284,7 @@ fun CategoryGrid(navController: NavController, viewModel: HomeViewModel) {
     val hasNfc = remember { NfcAdapter.getDefaultAdapter(context) != null }
 
     val categories = mutableListOf(
+        CategoryItem("Group Shopping Split", "Collect & Fair Split", Icons.Default.ShoppingCart, Screen.QuickOrderDashboard.route, Color(0xFFEDE7F6), Color(0xFF673AB7)),
         CategoryItem("GPS Tools", "Location & Speed", Icons.Default.MyLocation, Screen.GPSDashboard.route, Color(0xFFE3F2FD), Color(0xFF2196F3)),
         CategoryItem("Image Tools", "Crop & Convert", Icons.Default.PhotoLibrary, Screen.ImageDashboard.route, Color(0xFFF3E5F5), Color(0xFF9C27B0)),
         CategoryItem("QR & Barcode", "Scan & Generate", Icons.Default.QrCode, Screen.QRBarcodeDashboard.route, Color(0xFFE8F5E9), Color(0xFF4CAF50)),
@@ -305,8 +380,21 @@ fun CategoryCard(item: CategoryItem, modifier: Modifier = Modifier, onClick: () 
         ) {
             Icon(item.icon, contentDescription = item.title, tint = item.accentColor, modifier = Modifier.size(32.dp))
             Column {
-                Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Black)
-                Text(item.subtitle, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    item.subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -378,6 +466,7 @@ fun getToolNameFromRoute(route: String): String {
         Screen.RingtoneMaker.route -> "Ringtone Maker"
         Screen.AudioRecorder.route -> "Audio Recorder"
         Screen.AudioHistory.route -> "Audio History"
+        Screen.QuickOrderDashboard.route -> "Group Shopping with Smart Split"
         // add more specific routes as needed based on the AppNavigation map
         else -> ""
     }
@@ -385,6 +474,7 @@ fun getToolNameFromRoute(route: String): String {
 
 fun getIconForRoute(route: String): ImageVector? {
     return when (route) {
+        Screen.QuickOrderDashboard.route -> Icons.Default.ShoppingCart
         Screen.QRScanner.route -> Icons.Default.QrCodeScanner
         Screen.GPSDashboard.route -> Icons.Default.MyLocation
         Screen.SpinWheel.route -> Icons.Default.Casino

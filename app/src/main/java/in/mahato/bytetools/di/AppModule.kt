@@ -13,6 +13,9 @@ import `in`.mahato.bytetools.data.local.CalcDao
 import `in`.mahato.bytetools.data.local.HealthDao
 import `in`.mahato.bytetools.data.local.QRDao
 import `in`.mahato.bytetools.data.local.WheelOptionDao
+import `in`.mahato.bytetools.ui.tools.quickorder.data.local.QuickOrderDao
+import `in`.mahato.bytetools.ui.tools.quickorder.data.repository.QuickOrderRepository
+import `in`.mahato.bytetools.ui.tools.quickorder.data.repository.QuickOrderRepositoryImpl
 import `in`.mahato.bytetools.data.repository.ScanRepositoryImpl
 import `in`.mahato.bytetools.data.repository.HealthRepositoryImpl
 import `in`.mahato.bytetools.domain.repository.ScanRepository
@@ -47,6 +50,15 @@ object AppModule {
 
     @Provides
     fun provideWheelOptionDao(database: AppDatabase): WheelOptionDao = database.wheelOptionDao()
+
+    @Provides
+    fun provideQuickOrderDao(database: AppDatabase): QuickOrderDao = database.quickOrderDao()
+
+    @Provides
+    @Singleton
+    fun provideQuickOrderRepository(dao: QuickOrderDao): QuickOrderRepository {
+        return QuickOrderRepositoryImpl(dao)
+    }
 
     @Provides
     @Singleton

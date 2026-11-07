@@ -11,12 +11,35 @@ import `in`.mahato.bytetools.domain.model.WheelOption
 import `in`.mahato.bytetools.domain.model.WeightRecord
 import `in`.mahato.bytetools.domain.model.WeightGoal
 import `in`.mahato.bytetools.domain.model.UserHealthProfile
+import `in`.mahato.bytetools.ui.tools.quickorder.data.local.*
 
-@Database(entities = [ScanResult::class, CalcResult::class, BloodPressureRecord::class, BloodSugarRecord::class, QRRecord::class, WheelOption::class, WeightRecord::class, WeightGoal::class, UserHealthProfile::class], version = 9, exportSchema = false)
+@Database(
+    entities = [
+        ScanResult::class,
+        CalcResult::class,
+        BloodPressureRecord::class,
+        BloodSugarRecord::class,
+        QRRecord::class,
+        WheelOption::class,
+        WeightRecord::class,
+        WeightGoal::class,
+        UserHealthProfile::class,
+        GroupOrderEntity::class,
+        ParticipantEntity::class,
+        ParticipantOrderItemEntity::class,
+        BillItemEntity::class,
+        ItemAllocationEntity::class,
+        BillSummaryEntity::class,
+        PaymentRecordEntity::class
+    ],
+    version = 10,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun scanDao(): ScanDao
     abstract fun calcDao(): CalcDao
     abstract fun healthDao(): HealthDao
     abstract fun qrDao(): QRDao
     abstract fun wheelOptionDao(): WheelOptionDao
+    abstract fun quickOrderDao(): QuickOrderDao
 }

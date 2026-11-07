@@ -16,8 +16,8 @@ android {
         applicationId = "in.mahato.bytetools"
         minSdk = 24
         targetSdk = 36
-        versionCode = 34
-        versionName = "1.0.34"
+        versionCode = 35
+        versionName = "1.0.35"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

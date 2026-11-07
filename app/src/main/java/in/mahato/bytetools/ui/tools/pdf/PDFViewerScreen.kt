@@ -71,18 +71,22 @@ fun PDFViewerScreen(navController: NavController, initialUriString: String? = nu
                     },
                     update = { pdfView ->
                         pdfUri?.let { uri ->
-                            pdfView.fromUri(uri)
-                                .enableSwipe(true)
-                                .swipeHorizontal(false)
-                                .enableDoubletap(true)
-                                .defaultPage(0)
-                                .enableAnnotationRendering(false)
-                                .password(null)
-                                .scrollHandle(null)
-                                .enableAntialiasing(true)
-                                .spacing(10)
-                                .pageFitPolicy(FitPolicy.WIDTH)
-                                .load()
+                            val uriStr = uri.toString()
+                            if (pdfView.tag != uriStr) {
+                                pdfView.tag = uriStr
+                                pdfView.fromUri(uri)
+                                    .enableSwipe(true)
+                                    .swipeHorizontal(false)
+                                    .enableDoubletap(true)
+                                    .defaultPage(0)
+                                    .enableAnnotationRendering(false)
+                                    .password(null)
+                                    .scrollHandle(null)
+                                    .enableAntialiasing(true)
+                                    .spacing(12)
+                                    .pageFitPolicy(FitPolicy.WIDTH)
+                                    .load()
+                            }
                         }
                     }
                 )
