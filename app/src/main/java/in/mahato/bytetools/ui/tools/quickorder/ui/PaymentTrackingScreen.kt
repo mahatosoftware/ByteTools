@@ -53,6 +53,12 @@ fun PaymentTrackingScreen(
     val allPayments by viewModel.payments.collectAsState()
     val purchasePayments by viewModel.purchasePayments.collectAsState()
     val settlementTransfers by viewModel.settlementTransfers.collectAsState()
+    val summary by viewModel.billSummary.collectAsState()
+    val orderItems by viewModel.orderItems.collectAsState()
+    val consolidatedItems by viewModel.consolidatedItems.collectAsState()
+    val billItems by viewModel.billItems.collectAsState()
+
+    var showPdfExportSheet by remember { mutableStateOf(false) }
 
     var recordingPaymentParticipant by remember { mutableStateOf<ParticipantSettlement?>(null) }
     var targetRecipientId by remember { mutableStateOf<Long?>(null) }
@@ -106,6 +112,9 @@ fun PaymentTrackingScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showPdfExportSheet = true }) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Reports", tint = PurplePrimary)
+                    }
                     IconButton(onClick = {
                         navController.navigate("home") {
                             popUpTo("home") { inclusive = false }
@@ -733,6 +742,26 @@ fun PaymentTrackingScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (showPdfExportSheet && order != null) {
+        QuickOrderPdfExportBottomSheet(
+            order = order!!,
+            summary = summary,
+            settlements = settlements,
+            participants = participants,
+            orderItems = orderItems,
+            consolidatedItems = consolidatedItems,
+            billItems = billItems,
+            payments = allPayments,
+            purchasePayments = purchasePayments,
+            settlementTransfers = settlementTransfers,
+            navController = navController,
+            onWriteOffDifference = { newFinal ->
+                viewModel.writeOffUnallocatedDifference(orderId, newFinal)
+            },
+            onDismiss = { showPdfExportSheet = false }
         )
     }
 }

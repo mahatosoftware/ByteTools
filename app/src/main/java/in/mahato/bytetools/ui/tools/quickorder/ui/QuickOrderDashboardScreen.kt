@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +38,18 @@ fun QuickOrderDashboardScreen(
 ) {
     val orders by viewModel.allOrders.collectAsState()
     var orderToDelete by remember { mutableStateOf<GroupOrder?>(null) }
+    var orderForPdfExport by remember { mutableStateOf<GroupOrder?>(null) }
+
+    val activeOrder by viewModel.activeOrder.collectAsState()
+    val summary by viewModel.billSummary.collectAsState()
+    val settlements by viewModel.settlements.collectAsState()
+    val participants by viewModel.participants.collectAsState()
+    val orderItems by viewModel.orderItems.collectAsState()
+    val consolidatedItems by viewModel.consolidatedItems.collectAsState()
+    val billItems by viewModel.billItems.collectAsState()
+    val payments by viewModel.payments.collectAsState()
+    val purchasePayments by viewModel.purchasePayments.collectAsState()
+    val settlementTransfers by viewModel.settlementTransfers.collectAsState()
 
     Scaffold(
         topBar = {
@@ -155,6 +168,10 @@ fun QuickOrderDashboardScreen(
                                     OrderStatus.SETTLED -> navController.navigate("settlement_dashboard/${order.id}")
                                 }
                             },
+                            onPdfClick = {
+                                orderForPdfExport = order
+                                viewModel.selectOrder(order.id)
+                            },
                             onDelete = { orderToDelete = order }
                         )
                     }
@@ -189,12 +206,34 @@ fun QuickOrderDashboardScreen(
             }
         )
     }
+
+    if (orderForPdfExport != null) {
+        val currentOrder = activeOrder?.takeIf { it.id == orderForPdfExport?.id } ?: orderForPdfExport!!
+        QuickOrderPdfExportBottomSheet(
+            order = currentOrder,
+            summary = summary?.takeIf { it.groupOrderId == currentOrder.id },
+            settlements = if (activeOrder?.id == currentOrder.id) settlements else emptyList(),
+            participants = if (activeOrder?.id == currentOrder.id) participants else emptyList(),
+            orderItems = if (activeOrder?.id == currentOrder.id) orderItems else emptyList(),
+            consolidatedItems = if (activeOrder?.id == currentOrder.id) consolidatedItems else emptyList(),
+            billItems = if (activeOrder?.id == currentOrder.id) billItems else emptyList(),
+            payments = if (activeOrder?.id == currentOrder.id) payments else emptyList(),
+            purchasePayments = if (activeOrder?.id == currentOrder.id) purchasePayments else emptyList(),
+            settlementTransfers = if (activeOrder?.id == currentOrder.id) settlementTransfers else emptyList(),
+            navController = navController,
+            onWriteOffDifference = { newFinal ->
+                viewModel.writeOffUnallocatedDifference(currentOrder.id, newFinal)
+            },
+            onDismiss = { orderForPdfExport = null }
+        )
+    }
 }
 
 @Composable
 fun GroupOrderCard(
     order: GroupOrder,
     onClick: () -> Unit,
+    onPdfClick: () -> Unit,
     onDelete: () -> Unit
 ) {
     val dateStr = remember(order.createdAt) {
@@ -223,7 +262,7 @@ fun GroupOrderCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.ReceiptLong,
+                            Icons.AutoMirrored.Filled.ReceiptLong,
                             contentDescription = null,
                             tint = PurplePrimary,
                             modifier = Modifier.size(22.dp)
@@ -273,16 +312,33 @@ fun GroupOrderCard(
                     )
                 }
 
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(28.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        Icons.Default.DeleteOutline,
-                        contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp)
-                    )
+                    IconButton(
+                        onClick = onPdfClick,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PictureAsPdf,
+                            contentDescription = "Print / Export PDF Reports",
+                            tint = PurplePrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteOutline,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }

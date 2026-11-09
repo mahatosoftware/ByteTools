@@ -39,6 +39,14 @@ fun ReconciliationScreen(
     val billItems by viewModel.billItems.collectAsState()
     val initialReconItems by viewModel.reconciliationItems.collectAsState()
     val billSummary by viewModel.billSummary.collectAsState()
+    val allOrderItems by viewModel.orderItems.collectAsState()
+    val consolidatedItems by viewModel.consolidatedItems.collectAsState()
+    val settlements by viewModel.settlements.collectAsState()
+    val payments by viewModel.payments.collectAsState()
+    val purchasePayments by viewModel.purchasePayments.collectAsState()
+    val settlementTransfers by viewModel.settlementTransfers.collectAsState()
+
+    var showPdfExportSheet by remember { mutableStateOf(false) }
 
     // Local mutable state for participant allocations per reconciliation item
     // Key: BillItem ID -> Map<ParticipantId, AllocatedQuantity>
@@ -83,6 +91,9 @@ fun ReconciliationScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showPdfExportSheet = true }) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Reports", tint = PurplePrimary)
+                    }
                     IconButton(onClick = {
                         navController.navigate("home") {
                             popUpTo("home") { inclusive = false }
@@ -292,6 +303,26 @@ fun ReconciliationScreen(
             }
             }
         }
+    }
+
+    if (showPdfExportSheet && order != null) {
+        QuickOrderPdfExportBottomSheet(
+            order = order!!,
+            summary = billSummary,
+            settlements = settlements,
+            participants = participants,
+            orderItems = allOrderItems,
+            consolidatedItems = consolidatedItems,
+            billItems = billItems,
+            payments = payments,
+            purchasePayments = purchasePayments,
+            settlementTransfers = settlementTransfers,
+            navController = navController,
+            onWriteOffDifference = { newFinal ->
+                viewModel.writeOffUnallocatedDifference(orderId, newFinal)
+            },
+            onDismiss = { showPdfExportSheet = false }
+        )
     }
 }
 

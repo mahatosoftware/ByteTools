@@ -138,6 +138,12 @@ fun EnterBillScreen(
 
     val participants by viewModel.participants.collectAsState()
     val existingPurchasePayments by viewModel.purchasePayments.collectAsState()
+    val allOrderItems by viewModel.orderItems.collectAsState()
+    val settlements by viewModel.settlements.collectAsState()
+    val payments by viewModel.payments.collectAsState()
+    val settlementTransfers by viewModel.settlementTransfers.collectAsState()
+
+    var showPdfExportSheet by remember { mutableStateOf(false) }
 
     var isMultiplePayers by remember { mutableStateOf(false) }
     var singlePayerParticipantId by remember { mutableStateOf(0L) }
@@ -349,6 +355,9 @@ fun EnterBillScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showPdfExportSheet = true }) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Reports", tint = PurplePrimary)
+                    }
                     IconButton(onClick = {
                         navController.navigate("home") {
                             popUpTo("home") { inclusive = false }
@@ -1294,5 +1303,36 @@ fun EnterBillScreen(
                 }
             }
         }
+    }
+
+    if (showPdfExportSheet && order != null) {
+        val currentSummary = existingBillSummary ?: BillSummary(
+            groupOrderId = orderId,
+            subtotalPaise = subtotalPaise,
+            overallDiscountType = if (isDiscountPercentage) "PERCENTAGE" else "FIXED",
+            overallDiscountValue = rawOverallDiscount,
+            overallDiscountPaise = overallDiscountPaise,
+            taxPaise = taxPaise,
+            additionalChargesPaise = additionalChargesPaise,
+            additionalChargesNote = chargesNote,
+            finalBillAmountPaise = finalBillPaise
+        )
+        QuickOrderPdfExportBottomSheet(
+            order = order!!,
+            summary = currentSummary,
+            settlements = settlements,
+            participants = participants,
+            orderItems = allOrderItems,
+            consolidatedItems = consolidatedItems,
+            billItems = existingBillItems,
+            payments = payments,
+            purchasePayments = existingPurchasePayments,
+            settlementTransfers = settlementTransfers,
+            navController = navController,
+            onWriteOffDifference = { newFinal ->
+                viewModel.writeOffUnallocatedDifference(orderId, newFinal)
+            },
+            onDismiss = { showPdfExportSheet = false }
+        )
     }
 }

@@ -53,6 +53,8 @@ fun ConsolidatedListScreen(
     val summary by viewModel.billSummary.collectAsState()
     val settlements by viewModel.settlements.collectAsState()
     val payments by viewModel.payments.collectAsState()
+    val purchasePayments by viewModel.purchasePayments.collectAsState()
+    val settlementTransfers by viewModel.settlementTransfers.collectAsState()
 
     var showLockDialog by remember { mutableStateOf(false) }
     var showPdfExportSheet by remember { mutableStateOf(false) }
@@ -314,6 +316,8 @@ fun ConsolidatedListScreen(
             consolidatedItems = consolidatedItems,
             billItems = billItems,
             payments = payments,
+            purchasePayments = purchasePayments,
+            settlementTransfers = settlementTransfers,
             navController = navController,
             onWriteOffDifference = { newFinal ->
                 viewModel.writeOffUnallocatedDifference(orderId, newFinal)

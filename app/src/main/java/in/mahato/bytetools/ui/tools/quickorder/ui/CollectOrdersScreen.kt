@@ -50,6 +50,15 @@ fun CollectOrdersScreen(
     val participants by viewModel.participants.collectAsState()
     val allOrderItems by viewModel.orderItems.collectAsState()
     val distinctProducts by viewModel.distinctProducts.collectAsState()
+    val consolidatedItems by viewModel.consolidatedItems.collectAsState()
+    val billItems by viewModel.billItems.collectAsState()
+    val summary by viewModel.billSummary.collectAsState()
+    val settlements by viewModel.settlements.collectAsState()
+    val payments by viewModel.payments.collectAsState()
+    val purchasePayments by viewModel.purchasePayments.collectAsState()
+    val settlementTransfers by viewModel.settlementTransfers.collectAsState()
+
+    var showPdfExportSheet by remember { mutableStateOf(false) }
 
     var selectedParticipantId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(participants) {
@@ -99,6 +108,9 @@ fun CollectOrdersScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showPdfExportSheet = true }) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Reports", tint = PurplePrimary)
+                    }
                     IconButton(onClick = { showAddParticipantDialog = true }) {
                         Icon(Icons.Default.PersonAdd, contentDescription = "Add Participant")
                     }
@@ -524,6 +536,25 @@ fun CollectOrdersScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+    if (showPdfExportSheet && order != null) {
+        QuickOrderPdfExportBottomSheet(
+            order = order!!,
+            summary = summary,
+            settlements = settlements,
+            participants = participants,
+            orderItems = allOrderItems,
+            consolidatedItems = consolidatedItems,
+            billItems = billItems,
+            payments = payments,
+            purchasePayments = purchasePayments,
+            settlementTransfers = settlementTransfers,
+            navController = navController,
+            onWriteOffDifference = { newFinal ->
+                viewModel.writeOffUnallocatedDifference(orderId, newFinal)
+            },
+            onDismiss = { showPdfExportSheet = false }
         )
     }
 }

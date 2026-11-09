@@ -3,7 +3,9 @@ package `in`.mahato.bytetools.ui.tools.quickorder.ui
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,8 +48,20 @@ fun QuickOrderPdfExportBottomSheet(
 ) {
     val context = LocalContext.current
 
-    var selectedReportType by remember { mutableStateOf(PdfReportType.COMPLETE_SETTLEMENT) }
-    var selectedParticipantId by remember { mutableStateOf(participants.firstOrNull()?.id ?: 0L) }
+    val isGroupOrderAvailable = true
+    val isShopBillAvailable = billItems.isNotEmpty() || (summary != null && summary.finalBillAmountPaise > 0L)
+    val isSettlementAvailable = settlements.isNotEmpty() && summary != null
+    val isIndividualSettlementAvailable = isSettlementAvailable && participants.isNotEmpty()
+
+    val defaultReportType = when {
+        isSettlementAvailable && (order.status == OrderStatus.RECONCILED || order.status == OrderStatus.SETTLED) -> PdfReportType.COMPLETE_SETTLEMENT
+        isShopBillAvailable && order.status == OrderStatus.SHOPPING -> PdfReportType.FINAL_SHOP_BILL
+        isSettlementAvailable -> PdfReportType.COMPLETE_SETTLEMENT
+        isShopBillAvailable -> PdfReportType.FINAL_SHOP_BILL
+        else -> PdfReportType.COMPLETE_GROUP_ORDER
+    }
+    var selectedReportType by remember(order.id, isSettlementAvailable, isShopBillAvailable) { mutableStateOf(defaultReportType) }
+    var selectedParticipantId by remember(participants) { mutableStateOf(participants.firstOrNull()?.id ?: 0L) }
     var generatedFile by remember { mutableStateOf<File?>(null) }
     var isGenerating by remember { mutableStateOf(false) }
     var validationError by remember { mutableStateOf<String?>(null) }
@@ -60,7 +74,7 @@ fun QuickOrderPdfExportBottomSheet(
     fun generatePdf(action: (File) -> Unit) {
         // Validation check for settlement reports
         if (selectedReportType == PdfReportType.COMPLETE_SETTLEMENT || selectedReportType == PdfReportType.INDIVIDUAL_SETTLEMENT) {
-            if (settlements.isEmpty() || summary == null) {
+            if (!isSettlementAvailable) {
                 validationError = "Settlement is not finalized yet. Please enter the bill and reconcile first."
                 return
             }
@@ -68,6 +82,10 @@ fun QuickOrderPdfExportBottomSheet(
                 validationError = "Cannot export: Final payable amounts have an unallocated difference of ${SmartSplitEngine.formatPaise(unallocatedDiff, order.currency)}. Please balance allocations first."
                 return
             }
+        }
+        if (selectedReportType == PdfReportType.FINAL_SHOP_BILL && !isShopBillAvailable) {
+            validationError = "Shop bill has not been entered yet. Please enter bill items first."
+            return
         }
 
         validationError = null
@@ -167,6 +185,8 @@ fun QuickOrderPdfExportBottomSheet(
                 subtitle = "Combined executive summary, all members' payables & item breakdowns",
                 icon = Icons.Default.Assessment,
                 isSelected = selectedReportType == PdfReportType.COMPLETE_SETTLEMENT,
+                enabled = isSettlementAvailable,
+                disabledReason = "Available after smart split & cost allocation (Step 5)",
                 onClick = { selectedReportType = PdfReportType.COMPLETE_SETTLEMENT; validationError = null }
             )
 
@@ -177,11 +197,13 @@ fun QuickOrderPdfExportBottomSheet(
                 subtitle = "Personalized receipt & calculation statement for a specific participant",
                 icon = Icons.Default.Person,
                 isSelected = selectedReportType == PdfReportType.INDIVIDUAL_SETTLEMENT,
+                enabled = isIndividualSettlementAvailable,
+                disabledReason = "Available after smart split & cost allocation (Step 5)",
                 onClick = { selectedReportType = PdfReportType.INDIVIDUAL_SETTLEMENT; validationError = null }
             )
 
             // Participant selector if Individual chosen
-            if (selectedReportType == PdfReportType.INDIVIDUAL_SETTLEMENT && participants.isNotEmpty()) {
+            if (selectedReportType == PdfReportType.INDIVIDUAL_SETTLEMENT && isIndividualSettlementAvailable && participants.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     shape = RoundedCornerShape(12.dp),
@@ -191,7 +213,10 @@ fun QuickOrderPdfExportBottomSheet(
                     Column(modifier = Modifier.padding(10.dp)) {
                         Text("Select Member:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.horizontalScroll(rememberScrollState())
+                        ) {
                             participants.forEach { p ->
                                 val isSel = selectedParticipantId == p.id
                                 FilterChip(
@@ -216,6 +241,8 @@ fun QuickOrderPdfExportBottomSheet(
                 subtitle = "Full purchased items list, actual prices, discounts, and charges",
                 icon = Icons.Default.Receipt,
                 isSelected = selectedReportType == PdfReportType.FINAL_SHOP_BILL,
+                enabled = isShopBillAvailable,
+                disabledReason = "Available after entering the shop bill (Step 3)",
                 onClick = { selectedReportType = PdfReportType.FINAL_SHOP_BILL; validationError = null }
             )
 
@@ -226,6 +253,7 @@ fun QuickOrderPdfExportBottomSheet(
                 subtitle = "Initial collection, organizer details & consolidated shopping list",
                 icon = Icons.AutoMirrored.Filled.ListAlt,
                 isSelected = selectedReportType == PdfReportType.COMPLETE_GROUP_ORDER,
+                enabled = isGroupOrderAvailable,
                 onClick = { selectedReportType = PdfReportType.COMPLETE_GROUP_ORDER; validationError = null }
             )
 
@@ -372,13 +400,16 @@ private fun ReportOptionTile(
     subtitle: String,
     icon: ImageVector,
     isSelected: Boolean,
+    enabled: Boolean = true,
+    disabledReason: String? = null,
     onClick: () -> Unit
 ) {
+    val alpha = if (enabled) 1f else 0.45f
     Surface(
-        onClick = onClick,
+        onClick = { if (enabled) onClick() },
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) PurpleBackground else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, PurplePrimary) else null,
+        color = if (isSelected && enabled) PurpleBackground else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (enabled) 0.4f else 0.2f),
+        border = if (isSelected && enabled) androidx.compose.foundation.BorderStroke(1.5.dp, PurplePrimary) else null,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -389,35 +420,63 @@ private fun ReportOptionTile(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(if (isSelected) PurplePrimary else MaterialTheme.colorScheme.surface),
+                    .background(
+                        if (isSelected && enabled) PurplePrimary
+                        else if (!enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        else MaterialTheme.colorScheme.surface
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    icon,
+                    imageVector = if (!enabled) Icons.Default.Lock else icon,
                     contentDescription = null,
-                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (isSelected && enabled) Color.White
+                           else if (!enabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                           else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected && enabled) PurplePrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                    )
+                    if (!enabled) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = AmberBackground
+                        ) {
+                            Text(
+                                "Locked",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AmberWarning,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
                 Text(
-                    title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isSelected) PurplePrimary else MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    subtitle,
+                    if (!enabled && disabledReason != null) disabledReason else subtitle,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (!enabled) AmberWarning else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                     lineHeight = 14.sp
                 )
             }
             RadioButton(
-                selected = isSelected,
-                onClick = onClick,
-                colors = RadioButtonDefaults.colors(selectedColor = PurplePrimary)
+                selected = isSelected && enabled,
+                onClick = { if (enabled) onClick() },
+                enabled = enabled,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = PurplePrimary,
+                    disabledSelectedColor = PurplePrimary.copy(alpha = 0.3f),
+                    disabledUnselectedColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                )
             )
         }
     }
