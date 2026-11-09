@@ -442,4 +442,261 @@ class SmartSplitEngineTest {
         val sumPayable = settlements.sumOf { it.finalPayablePaise }
         assertEquals(207000L, sumPayable)
     }
+
+    // =========================================================================
+    // Test 13: Multiple Payers Upfront for Purchase & Net Settlement Balances
+    // Bill ₹3,000 total.
+    // Alice owes ₹1,000, Bob owes ₹1,000, Charlie owes ₹1,000.
+    // Upfront bill payment: Alice paid ₹500, Bob paid ₹2,500, Charlie paid ₹0.
+    // Net Balances:
+    // Alice: paid ₹500 - owes ₹1,000 = -₹500 (Owes ₹500)
+    // Bob: paid ₹2,500 - owes ₹1,000 = +₹1,500 (Gets back ₹1,500)
+    // Charlie: paid ₹0 - owes ₹1,000 = -₹1,000 (Owes ₹1,000)
+    // Sum of net balances must be exactly 0 (Conservation of money).
+    // =========================================================================
+    @Test
+    fun test13_multiplePayersUpfrontAndNetSettlementBalances() {
+        val alice = Participant(id = 1L, groupOrderId = 1L, name = "Alice", isOrganizer = true)
+        val bob = Participant(id = 2L, groupOrderId = 1L, name = "Bob", isOrganizer = false)
+        val charlie = Participant(id = 3L, groupOrderId = 1L, name = "Charlie", isOrganizer = false)
+        val participants = listOf(alice, bob, charlie)
+
+        val billItems = listOf(
+            BillItem(id = 1L, groupOrderId = 1L, productName = "Item A", quantity = 1.0, unitPricePaise = 100000L), // ₹1,000
+            BillItem(id = 2L, groupOrderId = 1L, productName = "Item B", quantity = 1.0, unitPricePaise = 100000L), // ₹1,000
+            BillItem(id = 3L, groupOrderId = 1L, productName = "Item C", quantity = 1.0, unitPricePaise = 100000L)  // ₹1,000
+        )
+
+        val allocations = listOf(
+            ItemAllocation(id = 1L, groupOrderId = 1L, billItemId = 1L, participantId = 1L, allocatedQuantity = 1.0),
+            ItemAllocation(id = 2L, groupOrderId = 1L, billItemId = 2L, participantId = 2L, allocatedQuantity = 1.0),
+            ItemAllocation(id = 3L, groupOrderId = 1L, billItemId = 3L, participantId = 3L, allocatedQuantity = 1.0)
+        )
+
+        val summary = BillSummary(
+            id = 1L,
+            groupOrderId = 1L,
+            subtotalPaise = 300000L,
+            overallDiscountPaise = 0L,
+            finalBillAmountPaise = 300000L
+        )
+
+        val purchasePayments = listOf(
+            PurchasePayment(id = 1L, groupOrderId = 1L, participantId = 1L, participantName = "Alice", amountPaise = 50000L, paymentMethod = "UPI"),
+            PurchasePayment(id = 2L, groupOrderId = 1L, participantId = 2L, participantName = "Bob", amountPaise = 250000L, paymentMethod = "Card")
+        )
+
+        val settlements = SmartSplitEngine.calculateSettlement(
+            billItems = billItems,
+            allocations = allocations,
+            billSummary = summary,
+            participants = participants,
+            payments = emptyList(),
+            purchasePayments = purchasePayments
+        )
+
+        val aliceS = settlements.first { it.participantId == 1L }
+        val bobS = settlements.first { it.participantId == 2L }
+        val charlieS = settlements.first { it.participantId == 3L }
+
+        // Final payables (Cost shares)
+        assertEquals(100000L, aliceS.finalPayablePaise)
+        assertEquals(100000L, bobS.finalPayablePaise)
+        assertEquals(100000L, charlieS.finalPayablePaise)
+
+        // Paid upfront for purchase
+        assertEquals(50000L, aliceS.paidForPurchasePaise)
+        assertEquals(250000L, bobS.paidForPurchasePaise)
+        assertEquals(0L, charlieS.paidForPurchasePaise)
+
+        // Net settlement balances
+        assertEquals(-50000L, aliceS.netBalancePaise)  // Alice owes ₹500
+        assertEquals(150000L, bobS.netBalancePaise)    // Bob gets back ₹1,500
+        assertEquals(-100000L, charlieS.netBalancePaise)// Charlie owes ₹1,000
+
+        // Conservation of money: Sum of net balances = 0
+        assertEquals(0L, settlements.sumOf { it.netBalancePaise })
+
+        // Initial outstanding balances
+        assertEquals(50000L, aliceS.outstandingBalancePaise)
+        assertEquals(150000L, bobS.outstandingBalancePaise)
+        assertEquals(100000L, charlieS.outstandingBalancePaise)
+    }
+
+    // =========================================================================
+    // Test 14: Debt Simplification Settlement Transfers
+    // Charlie owes ₹1,000, Alice owes ₹500 -> Bob gets back ₹1,500.
+    // Minimum transfers:
+    // Transfer 1: Charlie pays Bob ₹1,000
+    // Transfer 2: Alice pays Bob ₹500
+    // Total transactions = 2.
+    // =========================================================================
+    @Test
+    fun test14_settlementTransfersDebtSimplification() {
+        val alice = Participant(id = 1L, groupOrderId = 1L, name = "Alice", isOrganizer = true)
+        val bob = Participant(id = 2L, groupOrderId = 1L, name = "Bob", isOrganizer = false)
+        val charlie = Participant(id = 3L, groupOrderId = 1L, name = "Charlie", isOrganizer = false)
+        val participants = listOf(alice, bob, charlie)
+
+        val billItems = listOf(
+            BillItem(id = 1L, groupOrderId = 1L, productName = "Item A", quantity = 1.0, unitPricePaise = 100000L),
+            BillItem(id = 2L, groupOrderId = 1L, productName = "Item B", quantity = 1.0, unitPricePaise = 100000L),
+            BillItem(id = 3L, groupOrderId = 1L, productName = "Item C", quantity = 1.0, unitPricePaise = 100000L)
+        )
+
+        val allocations = listOf(
+            ItemAllocation(id = 1L, groupOrderId = 1L, billItemId = 1L, participantId = 1L, allocatedQuantity = 1.0),
+            ItemAllocation(id = 2L, groupOrderId = 1L, billItemId = 2L, participantId = 2L, allocatedQuantity = 1.0),
+            ItemAllocation(id = 3L, groupOrderId = 1L, billItemId = 3L, participantId = 3L, allocatedQuantity = 1.0)
+        )
+
+        val summary = BillSummary(id = 1L, groupOrderId = 1L, subtotalPaise = 300000L, overallDiscountPaise = 0L, finalBillAmountPaise = 300000L)
+        val purchasePayments = listOf(
+            PurchasePayment(id = 1L, groupOrderId = 1L, participantId = 1L, participantName = "Alice", amountPaise = 50000L, paymentMethod = "UPI"),
+            PurchasePayment(id = 2L, groupOrderId = 1L, participantId = 2L, participantName = "Bob", amountPaise = 250000L, paymentMethod = "Card")
+        )
+
+        val settlements = SmartSplitEngine.calculateSettlement(billItems, allocations, summary, participants, emptyList(), purchasePayments)
+        val transfers = SmartSplitEngine.calculateSettlementTransfers(settlements, emptyList())
+
+        assertEquals(2, transfers.size)
+
+        // Charlie (largest debtor: ₹1,000) pays Bob
+        val t1 = transfers[0]
+        assertEquals(3L, t1.fromParticipantId)
+        assertEquals("Charlie", t1.fromParticipantName)
+        assertEquals(2L, t1.toParticipantId)
+        assertEquals("Bob", t1.toParticipantName)
+        assertEquals(100000L, t1.amountPaise)
+        assertEquals(0L, t1.settledPaise)
+        assertEquals(100000L, t1.remainingPaise)
+        assertFalse(t1.isFullySettled)
+
+        // Alice (debtor: ₹500) pays Bob
+        val t2 = transfers[1]
+        assertEquals(1L, t2.fromParticipantId)
+        assertEquals("Alice", t2.fromParticipantName)
+        assertEquals(2L, t2.toParticipantId)
+        assertEquals("Bob", t2.toParticipantName)
+        assertEquals(50000L, t2.amountPaise)
+        assertEquals(0L, t2.settledPaise)
+        assertEquals(50000L, t2.remainingPaise)
+        assertFalse(t2.isFullySettled)
+    }
+
+    // =========================================================================
+    // Test 15: Settlement Payments Tracking and Partial / Full Settlement
+    // Alice records a settlement payment of ₹500 directly to Bob.
+    // Transfer from Alice to Bob should become fully settled.
+    // Charlie's transfer to Bob remains pending.
+    // =========================================================================
+    @Test
+    fun test15_settlementPaymentsDirectlySettleTransfers() {
+        val alice = Participant(id = 1L, groupOrderId = 1L, name = "Alice", isOrganizer = true)
+        val bob = Participant(id = 2L, groupOrderId = 1L, name = "Bob", isOrganizer = false)
+        val charlie = Participant(id = 3L, groupOrderId = 1L, name = "Charlie", isOrganizer = false)
+        val participants = listOf(alice, bob, charlie)
+
+        val billItems = listOf(
+            BillItem(id = 1L, groupOrderId = 1L, productName = "Item A", quantity = 1.0, unitPricePaise = 100000L),
+            BillItem(id = 2L, groupOrderId = 1L, productName = "Item B", quantity = 1.0, unitPricePaise = 100000L),
+            BillItem(id = 3L, groupOrderId = 1L, productName = "Item C", quantity = 1.0, unitPricePaise = 100000L)
+        )
+
+        val allocations = listOf(
+            ItemAllocation(id = 1L, groupOrderId = 1L, billItemId = 1L, participantId = 1L, allocatedQuantity = 1.0),
+            ItemAllocation(id = 2L, groupOrderId = 1L, billItemId = 2L, participantId = 2L, allocatedQuantity = 1.0),
+            ItemAllocation(id = 3L, groupOrderId = 1L, billItemId = 3L, participantId = 3L, allocatedQuantity = 1.0)
+        )
+
+        val summary = BillSummary(id = 1L, groupOrderId = 1L, subtotalPaise = 300000L, overallDiscountPaise = 0L, finalBillAmountPaise = 300000L)
+        val purchasePayments = listOf(
+            PurchasePayment(id = 1L, groupOrderId = 1L, participantId = 1L, participantName = "Alice", amountPaise = 50000L, paymentMethod = "UPI"),
+            PurchasePayment(id = 2L, groupOrderId = 1L, participantId = 2L, participantName = "Bob", amountPaise = 250000L, paymentMethod = "Card")
+        )
+
+        // Alice pays Bob ₹500 via UPI
+        val payments = listOf(
+            PaymentRecord(
+                id = 1L,
+                groupOrderId = 1L,
+                participantId = 1L,
+                toParticipantId = 2L,
+                amountPaise = 50000L,
+                paymentMethod = "UPI"
+            )
+        )
+
+        val settlements = SmartSplitEngine.calculateSettlement(billItems, allocations, summary, participants, payments, purchasePayments)
+        val transfers = SmartSplitEngine.calculateSettlementTransfers(settlements, payments)
+
+        val aliceS = settlements.first { it.participantId == 1L }
+        val bobS = settlements.first { it.participantId == 2L }
+
+        // Alice is now fully paid and has 0 outstanding balance
+        assertEquals(50000L, aliceS.amountPaidPaise)
+        assertEquals(0L, aliceS.outstandingBalancePaise)
+        assertEquals(PaymentStatus.PAID, aliceS.paymentStatus)
+
+        // Bob has received ₹500, outstanding balance to receive is now ₹1,000 (from Charlie)
+        assertEquals(50000L, bobS.amountReceivedPaise)
+        assertEquals(100000L, bobS.outstandingBalancePaise)
+        assertEquals(PaymentStatus.PARTIALLY_PAID, bobS.paymentStatus)
+
+        // Transfers check
+        val aliceTransfer = transfers.first { it.fromParticipantId == 1L }
+        assertEquals(50000L, aliceTransfer.settledPaise)
+        assertEquals(0L, aliceTransfer.remainingPaise)
+        assertTrue(aliceTransfer.isFullySettled)
+
+        val charlieTransfer = transfers.first { it.fromParticipantId == 3L }
+        assertEquals(0L, charlieTransfer.settledPaise)
+        assertEquals(100000L, charlieTransfer.remainingPaise)
+        assertFalse(charlieTransfer.isFullySettled)
+    }
+
+    // =========================================================================
+    // Test 16: Backward Compatibility – Organizer Paid 100% when purchasePayments empty
+    // If purchasePayments is omitted or empty, organizer is credited with 100% of bill.
+    // =========================================================================
+    @Test
+    fun test16_backwardCompatibilityOrganizerPaid100Percent() {
+        val alice = Participant(id = 1L, groupOrderId = 1L, name = "Alice", isOrganizer = true)
+        val bob = Participant(id = 2L, groupOrderId = 1L, name = "Bob", isOrganizer = false)
+        val participants = listOf(alice, bob)
+
+        val billItems = listOf(
+            BillItem(id = 1L, groupOrderId = 1L, productName = "Item A", quantity = 1.0, unitPricePaise = 100000L), // ₹1,000
+            BillItem(id = 2L, groupOrderId = 1L, productName = "Item B", quantity = 1.0, unitPricePaise = 100000L)  // ₹1,000
+        )
+
+        val allocations = listOf(
+            ItemAllocation(id = 1L, groupOrderId = 1L, billItemId = 1L, participantId = 1L, allocatedQuantity = 1.0),
+            ItemAllocation(id = 2L, groupOrderId = 1L, billItemId = 2L, participantId = 2L, allocatedQuantity = 1.0)
+        )
+
+        val summary = BillSummary(id = 1L, groupOrderId = 1L, subtotalPaise = 200000L, overallDiscountPaise = 0L, finalBillAmountPaise = 200000L)
+
+        // Omit purchasePayments -> defaults to emptyList()
+        val settlements = SmartSplitEngine.calculateSettlement(billItems, allocations, summary, participants)
+
+        val aliceS = settlements.first { it.participantId == 1L }
+        val bobS = settlements.first { it.participantId == 2L }
+
+        // Organizer paid full ₹2,000
+        assertEquals(200000L, aliceS.paidForPurchasePaise)
+        assertEquals(100000L, aliceS.finalPayablePaise)
+        assertEquals(100000L, aliceS.netBalancePaise) // Gets back ₹1,000
+
+        // Bob owes ₹1,000
+        assertEquals(0L, bobS.paidForPurchasePaise)
+        assertEquals(100000L, bobS.finalPayablePaise)
+        assertEquals(-100000L, bobS.netBalancePaise) // Owes ₹1,000
+
+        val transfers = SmartSplitEngine.calculateSettlementTransfers(settlements)
+        assertEquals(1, transfers.size)
+        assertEquals(2L, transfers[0].fromParticipantId) // Bob
+        assertEquals(1L, transfers[0].toParticipantId)   // Alice
+        assertEquals(100000L, transfers[0].amountPaise)
+    }
 }

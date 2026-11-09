@@ -62,19 +62,30 @@ class QuickOrderViewModel @Inject constructor(
         if (id == null) flowOf(emptyList()) else repository.observePayments(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val purchasePayments: StateFlow<List<PurchasePayment>> = _currentOrderId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList()) else repository.observePurchasePayments(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Calculated Settlements
     val settlements: StateFlow<List<ParticipantSettlement>> = combine(
-        billItems,
-        allocations,
-        billSummary,
+        combine(billItems, allocations, billSummary) { items, allocs, sum -> Triple(items, allocs, sum) },
         participants,
-        payments
-    ) { items, allocs, summary, parts, pmts ->
+        payments,
+        purchasePayments
+    ) { (items, allocs, summary), parts, pmts, pPayments ->
         if (summary != null && parts.isNotEmpty()) {
-            SmartSplitEngine.calculateSettlement(items, allocs, summary, parts, pmts)
+            SmartSplitEngine.calculateSettlement(items, allocs, summary, parts, pmts, pPayments)
         } else {
             emptyList()
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Calculated Settlement Transfers (Who pays whom)
+    val settlementTransfers: StateFlow<List<SettlementTransfer>> = combine(
+        settlements,
+        payments
+    ) { setts, pmts ->
+        SmartSplitEngine.calculateSettlementTransfers(setts, pmts)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Reconciliation state
@@ -239,13 +250,26 @@ class QuickOrderViewModel @Inject constructor(
         }
     }
 
+    fun savePurchasePayments(orderId: Long, payments: List<PurchasePayment>) {
+        viewModelScope.launch {
+            repository.savePurchasePayments(orderId, payments)
+        }
+    }
+
+    fun deletePurchasePayment(paymentId: Long) {
+        viewModelScope.launch {
+            repository.deletePurchasePayment(paymentId)
+        }
+    }
+
     fun recordPayment(
         orderId: Long,
         participantId: Long,
+        toParticipantId: Long? = null,
         amountPaise: Long,
-        method: String,
-        reference: String?,
-        notes: String?
+        method: String = "Paid",
+        reference: String? = null,
+        notes: String? = null
     ) {
         if (amountPaise <= 0L) return
         viewModelScope.launch {
@@ -253,6 +277,7 @@ class QuickOrderViewModel @Inject constructor(
                 PaymentRecord(
                     groupOrderId = orderId,
                     participantId = participantId,
+                    toParticipantId = toParticipantId,
                     amountPaise = amountPaise,
                     paymentMethod = method,
                     transactionReference = reference?.trim(),

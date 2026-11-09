@@ -30,10 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import `in`.mahato.bytetools.ui.tools.quickorder.domain.engine.ParsedReceipt
 import `in`.mahato.bytetools.ui.tools.quickorder.domain.engine.SmartSplitEngine
-import `in`.mahato.bytetools.ui.tools.quickorder.domain.model.BillItem
-import `in`.mahato.bytetools.ui.tools.quickorder.domain.model.BillSummary
-import `in`.mahato.bytetools.ui.tools.quickorder.domain.model.OrderStatus
-import `in`.mahato.bytetools.ui.tools.quickorder.domain.model.SplitMethod
+import `in`.mahato.bytetools.ui.tools.quickorder.domain.model.*
 import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
 
@@ -107,7 +104,7 @@ private fun calculateTotalPrice(unitStr: String, qtyStr: String): String {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EnterBillScreen(
     orderId: Long,
@@ -138,6 +135,13 @@ fun EnterBillScreen(
     var additionalChargesText by remember { mutableStateOf("") }
     var chargesNote by remember { mutableStateOf("") }
     var statedFinalBillText by remember { mutableStateOf("") }
+
+    val participants by viewModel.participants.collectAsState()
+    val existingPurchasePayments by viewModel.purchasePayments.collectAsState()
+
+    var isMultiplePayers by remember { mutableStateOf(false) }
+    var singlePayerParticipantId by remember { mutableStateOf(0L) }
+    val multiplePayersAmounts = remember { mutableStateMapOf<Long, String>() }
 
     // OCR State
     var isOcrScanning by remember { mutableStateOf(false) }
@@ -196,6 +200,25 @@ fun EnterBillScreen(
             }
             if (statedFinalBillText.isBlank() && sum.finalBillAmountPaise > 0L) {
                 statedFinalBillText = formatNumberInput(sum.finalBillAmountPaise)
+            }
+        }
+    }
+
+    LaunchedEffect(participants, existingPurchasePayments) {
+        if (singlePayerParticipantId == 0L && participants.isNotEmpty()) {
+            val org = participants.firstOrNull { it.isOrganizer } ?: participants.first()
+            singlePayerParticipantId = org.id
+        }
+
+        if (existingPurchasePayments.isNotEmpty()) {
+            if (existingPurchasePayments.size == 1) {
+                isMultiplePayers = false
+                singlePayerParticipantId = existingPurchasePayments.first().participantId
+            } else {
+                isMultiplePayers = true
+                existingPurchasePayments.forEach { pp ->
+                    multiplePayersAmounts[pp.participantId] = formatNumberInput(pp.amountPaise)
+                }
             }
         }
     }
@@ -265,6 +288,45 @@ fun EnterBillScreen(
 
     val calculatedFinalBillPaise = netSubtotalPaise - overallDiscountPaise + taxPaise + additionalChargesPaise
     val finalBillPaise = statedFinalBillText.replace(',', '.').toDoubleOrNull()?.let { (it * 100).roundToLong() } ?: calculatedFinalBillPaise
+
+    val totalCapturedPurchasePaise = if (!isMultiplePayers) {
+        finalBillPaise
+    } else {
+        participants.sumOf { p ->
+            val text = multiplePayersAmounts[p.id] ?: ""
+            ((text.replace(',', '.').toDoubleOrNull() ?: 0.0) * 100).roundToLong()
+        }
+    }
+    val purchaseDiffPaise = finalBillPaise - totalCapturedPurchasePaise
+
+    fun buildPurchasePaymentsToSave(): List<PurchasePayment> {
+        val currPayerId = if (singlePayerParticipantId != 0L) singlePayerParticipantId else (participants.firstOrNull { it.isOrganizer }?.id ?: participants.firstOrNull()?.id ?: 0L)
+        return if (!isMultiplePayers) {
+            val pName = participants.firstOrNull { it.id == currPayerId }?.name ?: "Organizer"
+            listOf(
+                PurchasePayment(
+                    groupOrderId = orderId,
+                    participantId = currPayerId,
+                    participantName = pName,
+                    amountPaise = finalBillPaise,
+                    paymentMethod = "Cash"
+                )
+            )
+        } else {
+            participants.mapNotNull { p ->
+                val amtPaise = ((multiplePayersAmounts[p.id]?.replace(',', '.')?.toDoubleOrNull() ?: 0.0) * 100).roundToLong()
+                if (amtPaise > 0L) {
+                    PurchasePayment(
+                        groupOrderId = orderId,
+                        participantId = p.id,
+                        participantName = p.name,
+                        amountPaise = amtPaise,
+                        paymentMethod = "Cash"
+                    )
+                } else null
+            }
+        }
+    }
 
     val isFinalized = order?.status == OrderStatus.RECONCILED || order?.status == OrderStatus.SETTLED
 
@@ -365,6 +427,7 @@ fun EnterBillScreen(
                                     discountSplitMethod = SplitMethod.PROPORTIONAL
                                 )
                                 viewModel.saveBillItemsAndSummary(orderId, itemsToSave, summaryToSave)
+                                viewModel.savePurchasePayments(orderId, buildPurchasePaymentsToSave())
                                 navController.navigate("reconciliation/$orderId")
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary),
@@ -976,6 +1039,260 @@ fun EnterBillScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(10.dp)
                                 )
+                            }
+                        }
+                    }
+
+                    // Who Paid for this Purchase Section
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Payments,
+                                        contentDescription = null,
+                                        tint = PurplePrimary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Who Paid for this Purchase?",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Capture who actually paid the merchant upfront so the app can compute fair settlement amounts.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Toggle Single Payer vs Multiple Payers
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = !isMultiplePayers,
+                                        onClick = { if (!isFinalized) isMultiplePayers = false },
+                                        enabled = !isFinalized,
+                                        label = { Text("Single Person Paid (100%)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                                        leadingIcon = {
+                                            if (!isMultiplePayers) Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp)) else null
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = PurplePrimary,
+                                            selectedLabelColor = Color.White
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    FilterChip(
+                                        selected = isMultiplePayers,
+                                        onClick = {
+                                            if (!isFinalized) {
+                                                isMultiplePayers = true
+                                                if (multiplePayersAmounts.isEmpty() && singlePayerParticipantId != 0L) {
+                                                    multiplePayersAmounts[singlePayerParticipantId] = formatNumberInput(finalBillPaise)
+                                                }
+                                            }
+                                        },
+                                        enabled = !isFinalized,
+                                        label = { Text("Multiple People Paid", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                                        leadingIcon = {
+                                            if (isMultiplePayers) Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(14.dp)) else null
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = PurplePrimary,
+                                            selectedLabelColor = Color.White
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                if (!isMultiplePayers) {
+                                    Text("Select Who Paid:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    FlowRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        participants.forEach { p ->
+                                            FilterChip(
+                                                selected = singlePayerParticipantId == p.id,
+                                                onClick = { if (!isFinalized) singlePayerParticipantId = p.id },
+                                                enabled = !isFinalized,
+                                                label = {
+                                                    Text(
+                                                        if (p.isOrganizer) "${p.name} (Organizer)" else p.name,
+                                                        fontSize = 12.sp
+                                                    )
+                                                },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = PurpleBackground,
+                                                    selectedLabelColor = PurplePrimary
+                                                )
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val payerName = participants.firstOrNull { it.id == singlePayerParticipantId }?.name ?: "Organizer"
+                                            Text("$payerName paid the entire bill:", style = MaterialTheme.typography.bodyMedium)
+                                            Text(
+                                                SmartSplitEngine.formatPaise(finalBillPaise, order?.currency ?: "₹"),
+                                                fontWeight = FontWeight.Bold,
+                                                color = PurplePrimary
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Amounts paid by members:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+
+                                        if (!isFinalized) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    if (participants.isNotEmpty()) {
+                                                        val split = SmartSplitEngine.distributePaiseEqually(finalBillPaise, participants.map { it.id })
+                                                        split.forEach { (id, paise) ->
+                                                            multiplePayersAmounts[id] = formatNumberInput(paise)
+                                                        }
+                                                    }
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(28.dp)
+                                            ) {
+                                                Text("Split Equally", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    participants.forEach { p ->
+                                        val amtText = multiplePayersAmounts[p.id] ?: ""
+
+                                        Card(
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                        ) {
+                                            Column(modifier = Modifier.padding(10.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        if (p.isOrganizer) "${p.name} (Organizer)" else p.name,
+                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.bodyMedium
+                                                    )
+
+                                                    if (!isFinalized) {
+                                                        TextButton(
+                                                            onClick = {
+                                                                val otherPaidPaise = participants.filter { it.id != p.id }.sumOf { other ->
+                                                                    val t = multiplePayersAmounts[other.id] ?: ""
+                                                                    ((t.replace(',', '.').toDoubleOrNull() ?: 0.0) * 100).roundToLong()
+                                                                }
+                                                                val remPaise = kotlin.math.max(0L, finalBillPaise - otherPaidPaise)
+                                                                multiplePayersAmounts[p.id] = formatNumberInput(remPaise)
+                                                            },
+                                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                            modifier = Modifier.height(26.dp)
+                                                        ) {
+                                                            Text("Fill Remaining", fontSize = 11.sp, color = PurplePrimary)
+                                                        }
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(6.dp))
+
+                                                OutlinedTextField(
+                                                    value = amtText,
+                                                    onValueChange = { if (!isFinalized) multiplePayersAmounts[p.id] = sanitizeDecimalInput(it) },
+                                                    label = { Text("Amount (${order?.currency ?: "₹"})") },
+                                                    placeholder = { Text("0") },
+                                                    readOnly = isFinalized,
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                                    singleLine = true,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    shape = RoundedCornerShape(10.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (purchaseDiffPaise == 0L) GreenBackground else AmberBackground,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    if (purchaseDiffPaise == 0L) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                                    contentDescription = null,
+                                                    tint = if (purchaseDiffPaise == 0L) GreenSuccess else AmberWarning,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    "Captured: ${SmartSplitEngine.formatPaise(totalCapturedPurchasePaise, order?.currency ?: "₹")}",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (purchaseDiffPaise == 0L) GreenSuccess else AmberWarning
+                                                )
+                                            }
+
+                                            Text(
+                                                if (purchaseDiffPaise == 0L) "100% Balanced" else if (purchaseDiffPaise > 0L) "Diff: -${SmartSplitEngine.formatPaise(purchaseDiffPaise, order?.currency ?: "₹")}" else "Diff: +${SmartSplitEngine.formatPaise(kotlin.math.abs(purchaseDiffPaise), order?.currency ?: "₹")}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (purchaseDiffPaise == 0L) GreenSuccess else AmberWarning
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

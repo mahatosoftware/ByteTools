@@ -12,6 +12,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 import kotlin.math.max
 
 enum class PdfReportType {
@@ -294,7 +295,8 @@ object QuickOrderPdfGenerator {
         context: Context,
         order: GroupOrder,
         settlement: ParticipantSettlement,
-        payments: List<PaymentRecord>
+        payments: List<PaymentRecord>,
+        settlementTransfers: List<SettlementTransfer> = emptyList()
     ): File {
         val curr = order.currency
         val dateStr = SimpleDateFormat("dd MMMM yyyy, hh:mm a", Locale.getDefault()).format(Date(System.currentTimeMillis()))
@@ -341,7 +343,7 @@ object QuickOrderPdfGenerator {
             }
 
             renderer.addSpacing(14f)
-            renderer.addSectionTitle("3. Cost Allocation & Net Payable")
+            renderer.addSectionTitle("3. Cost Allocation & Net Balance")
             val calcRows = mutableListOf(
                 "Original Subtotal" to SmartSplitEngine.formatPaise(settlement.originalSubtotalPaise, curr)
             )
@@ -357,27 +359,68 @@ object QuickOrderPdfGenerator {
             if (settlement.additionalChargesSharePaise > 0L) {
                 calcRows.add("Additional Charges Share" to "+${SmartSplitEngine.formatPaise(settlement.additionalChargesSharePaise, curr)}")
             }
-            calcRows.add("Final Amount Payable" to SmartSplitEngine.formatPaise(settlement.finalPayablePaise, curr))
-            calcRows.add("Amount Paid So Far" to SmartSplitEngine.formatPaise(settlement.amountPaidPaise, curr))
+            calcRows.add("Cost Share (Final Payable)" to SmartSplitEngine.formatPaise(settlement.finalPayablePaise, curr))
+            if (settlement.paidForPurchasePaise > 0L) {
+                calcRows.add("Paid Upfront for Purchase" to SmartSplitEngine.formatPaise(settlement.paidForPurchasePaise, curr))
+            }
+            val netText = when {
+                settlement.netBalancePaise > 0L -> "Gets back +${SmartSplitEngine.formatPaise(settlement.netBalancePaise, curr)}"
+                settlement.netBalancePaise < 0L -> "Owes -${SmartSplitEngine.formatPaise(abs(settlement.netBalancePaise), curr)}"
+                else -> "Settled Up (0)"
+            }
+            calcRows.add("Net Settlement Balance" to netText)
+            calcRows.add("Settlement Paid / Sent" to SmartSplitEngine.formatPaise(settlement.amountPaidPaise, curr))
+            if (settlement.amountReceivedPaise > 0L) {
+                calcRows.add("Settlement Received" to SmartSplitEngine.formatPaise(settlement.amountReceivedPaise, curr))
+            }
             calcRows.add("Remaining Balance Due" to SmartSplitEngine.formatPaise(settlement.outstandingBalancePaise, curr))
             renderer.addKeyValuePairs(calcRows, highlightLast = true)
+
+            // Peer-to-peer settlement transfers
+            val myTransfers = settlementTransfers.filter {
+                it.fromParticipantId == settlement.participantId || it.toParticipantId == settlement.participantId
+            }
+            var nextSectionNum = 4
+            if (myTransfers.isNotEmpty()) {
+                renderer.addSpacing(14f)
+                renderer.addSectionTitle("$nextSectionNum. Settlement Transfers (Who to Pay / Receive From)")
+                nextSectionNum++
+                val stHeaders = listOf("Action", "Counterparty", "Total Transfer", "Settled", "Remaining", "Status")
+                val stColWidths = floatArrayOf(85f, 130f, 85f, 75f, 80f, 68f)
+                val stAlignments = listOf(Paint.Align.LEFT, Paint.Align.LEFT, Paint.Align.RIGHT, Paint.Align.RIGHT, Paint.Align.RIGHT, Paint.Align.CENTER)
+                val stRows = myTransfers.map { t ->
+                    val isDebtor = t.fromParticipantId == settlement.participantId
+                    listOf(
+                        if (isDebtor) "Pay To" else "Receive From",
+                        if (isDebtor) t.toParticipantName else t.fromParticipantName,
+                        SmartSplitEngine.formatPaise(t.amountPaise, curr),
+                        SmartSplitEngine.formatPaise(t.settledPaise, curr),
+                        SmartSplitEngine.formatPaise(t.remainingPaise, curr),
+                        if (t.isFullySettled) "SETTLED" else "PENDING"
+                    )
+                }
+                renderer.addSolidTable(stHeaders, stRows, stColWidths, stAlignments)
+            }
 
             // Payment History section
             val participantPayments = payments.filter { it.participantId == settlement.participantId }
             if (participantPayments.isNotEmpty()) {
                 renderer.addSpacing(14f)
-                renderer.addSectionTitle("4. Payment Records")
-                val pmtHeaders = listOf("Date", "Method", "Amount", "Reference / Notes")
-                val pmtColWidths = floatArrayOf(125f, 85f, 95f, 218f)
+                renderer.addSectionTitle("$nextSectionNum. Payment Records")
+                val pmtHeaders = listOf("Date", "Paid To", "Amount", "Notes")
+                val pmtColWidths = floatArrayOf(135f, 115f, 105f, 168f)
                 val pmtAlignments = listOf(Paint.Align.LEFT, Paint.Align.LEFT, Paint.Align.RIGHT, Paint.Align.LEFT)
 
                 val pmtRows = participantPayments.map { pmt ->
                     val pmtDateStr = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(pmt.paymentDate))
+                    val toName = if (pmt.toParticipantId != null) {
+                        settlementTransfers.firstOrNull { it.toParticipantId == pmt.toParticipantId }?.toParticipantName ?: "Member"
+                    } else order.organizerName
                     listOf(
                         pmtDateStr,
-                        pmt.paymentMethod,
+                        toName,
                         SmartSplitEngine.formatPaise(pmt.amountPaise, curr),
-                        listOfNotNull(pmt.transactionReference, pmt.notes).joinToString(" - ").ifBlank { "Recorded" }
+                        listOfNotNull(pmt.notes?.ifBlank { null }, pmt.transactionReference?.ifBlank { null }).joinToString(" - ").ifBlank { "Recorded" }
                     )
                 }
                 renderer.addSolidTable(pmtHeaders, pmtRows, pmtColWidths, pmtAlignments)
@@ -398,7 +441,9 @@ object QuickOrderPdfGenerator {
         context: Context,
         order: GroupOrder,
         summary: BillSummary,
-        settlements: List<ParticipantSettlement>
+        settlements: List<ParticipantSettlement>,
+        purchasePayments: List<PurchasePayment> = emptyList(),
+        settlementTransfers: List<SettlementTransfer> = emptyList()
     ): File {
         val curr = order.currency
         val dateStr = SimpleDateFormat("dd MMMM yyyy, hh:mm a", Locale.getDefault()).format(Date(System.currentTimeMillis()))
@@ -412,8 +457,11 @@ object QuickOrderPdfGenerator {
             reportTitle = "Complete Group Settlement Report",
             filename = "CompleteSettlement_${sanitizeFilename(order.orderName)}.pdf"
         ) { renderer ->
+            var sectionIndex = 1
+
             // Section 1: Executive Summary
-            renderer.addSectionTitle("1. Executive Summary")
+            renderer.addSectionTitle("$sectionIndex. Executive Summary")
+            sectionIndex++
 
             // Metadata & Audit Status
             renderer.addMetadataRow(
@@ -436,8 +484,32 @@ object QuickOrderPdfGenerator {
 
             renderer.addSpacing(16f)
 
-            // Section 2: Participant Settlement Ledger
-            renderer.addSectionTitle("2. Participant Settlement Ledger")
+            // Upfront Purchase Contributions (if specified)
+            if (purchasePayments.isNotEmpty()) {
+                renderer.addSectionTitle("$sectionIndex. Purchase Contributions (Paid Upfront)")
+                sectionIndex++
+
+                val ppHeaders = listOf("Participant", "Amount Paid", "Share of Bill")
+                val ppColWidths = floatArrayOf(240f, 140f, 143f)
+                val ppAlignments = listOf(Paint.Align.LEFT, Paint.Align.RIGHT, Paint.Align.RIGHT)
+
+                val ppRows = purchasePayments.map { pp ->
+                    val pctStr = if (summary.finalBillAmountPaise > 0L) {
+                        String.format(Locale.US, "%.1f%%", (pp.amountPaise.toDouble() / summary.finalBillAmountPaise.toDouble()) * 100)
+                    } else "100%"
+                    listOf(
+                        pp.participantName,
+                        SmartSplitEngine.formatPaise(pp.amountPaise, curr),
+                        pctStr
+                    )
+                }
+                renderer.addSolidTable(ppHeaders, ppRows, ppColWidths, ppAlignments)
+                renderer.addSpacing(16f)
+            }
+
+            // Participant Settlement Ledger
+            renderer.addSectionTitle("$sectionIndex. Participant Settlement Ledger")
+            sectionIndex++
 
             val ledgerHeaders = listOf("Participant", "Role", "Subtotal", "Discount", "Taxes/Extra", "Payable", "Paid", "Balance", "Status")
             val ledgerColWidths = floatArrayOf(95f, 52f, 56f, 54f, 54f, 62f, 50f, 50f, 50f)
@@ -470,10 +542,33 @@ object QuickOrderPdfGenerator {
             val ledgerStatuses = settlements.map { it.paymentStatus }
             renderer.addLedgerTable(ledgerHeaders, ledgerRows, ledgerColWidths, ledgerAlignments, ledgerStatuses)
 
+            // Settlement Plan (Who Pays Whom)
+            if (settlementTransfers.isNotEmpty()) {
+                renderer.addSpacing(16f)
+                renderer.addSectionTitle("$sectionIndex. Settlement Plan (Who Pays Whom)")
+                sectionIndex++
+
+                val stHeaders = listOf("From (Debtor)", "To (Creditor)", "Transfer Amount", "Settled", "Remaining", "Status")
+                val stColWidths = floatArrayOf(120f, 120f, 85f, 75f, 75f, 48f)
+                val stAlignments = listOf(Paint.Align.LEFT, Paint.Align.LEFT, Paint.Align.RIGHT, Paint.Align.RIGHT, Paint.Align.RIGHT, Paint.Align.CENTER)
+
+                val stRows = settlementTransfers.map { t ->
+                    listOf(
+                        t.fromParticipantName,
+                        t.toParticipantName,
+                        SmartSplitEngine.formatPaise(t.amountPaise, curr),
+                        SmartSplitEngine.formatPaise(t.settledPaise, curr),
+                        SmartSplitEngine.formatPaise(t.remainingPaise, curr),
+                        if (t.isFullySettled) "SETTLED" else "PENDING"
+                    )
+                }
+                renderer.addSolidTable(stHeaders, stRows, stColWidths, stAlignments)
+            }
+
             renderer.addSpacing(18f)
 
-            // Section 3: Detailed Individual Member Breakdowns
-            renderer.addSectionTitle("3. Detailed Individual Member Breakdowns")
+            // Detailed Individual Member Breakdowns
+            renderer.addSectionTitle("$sectionIndex. Detailed Individual Member Breakdowns")
 
             val itemHeaders = listOf("Product", "Quantity", "Actual Price", "Gross Amount", "Net Amount")
             val itemColWidths = floatArrayOf(170f, 65f, 95f, 95f, 98f)

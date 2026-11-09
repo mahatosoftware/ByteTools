@@ -275,6 +275,7 @@ data class PaymentRecordEntity(
     val id: Long = 0,
     val groupOrderId: Long,
     val participantId: Long,
+    val toParticipantId: Long? = null,
     val amountPaise: Long,
     val paymentMethod: String = "Cash",
     val transactionReference: String? = null,
@@ -285,6 +286,7 @@ data class PaymentRecordEntity(
         id = id,
         groupOrderId = groupOrderId,
         participantId = participantId,
+        toParticipantId = toParticipantId,
         amountPaise = amountPaise,
         paymentMethod = paymentMethod,
         transactionReference = transactionReference,
@@ -297,11 +299,50 @@ data class PaymentRecordEntity(
             id = record.id,
             groupOrderId = record.groupOrderId,
             participantId = record.participantId,
+            toParticipantId = record.toParticipantId,
             amountPaise = record.amountPaise,
             paymentMethod = record.paymentMethod,
             transactionReference = record.transactionReference,
             notes = record.notes,
             paymentDate = record.paymentDate
+        )
+    }
+}
+
+@Entity(
+    tableName = "quick_purchase_payments",
+    indices = [Index("groupOrderId"), Index("participantId")]
+)
+data class PurchasePaymentEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val groupOrderId: Long,
+    val participantId: Long,
+    val amountPaise: Long,
+    val paymentMethod: String = "Cash",
+    val notes: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    fun toDomain(participantName: String = "") = PurchasePayment(
+        id = id,
+        groupOrderId = groupOrderId,
+        participantId = participantId,
+        participantName = participantName,
+        amountPaise = amountPaise,
+        paymentMethod = paymentMethod,
+        notes = notes,
+        createdAt = createdAt
+    )
+
+    companion object {
+        fun fromDomain(payment: PurchasePayment) = PurchasePaymentEntity(
+            id = payment.id,
+            groupOrderId = payment.groupOrderId,
+            participantId = payment.participantId,
+            amountPaise = payment.amountPaise,
+            paymentMethod = payment.paymentMethod,
+            notes = payment.notes,
+            createdAt = payment.createdAt
         )
     }
 }

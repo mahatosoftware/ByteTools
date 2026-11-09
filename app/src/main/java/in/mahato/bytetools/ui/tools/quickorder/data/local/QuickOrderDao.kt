@@ -136,12 +136,36 @@ interface QuickOrderDao {
     @Query("DELETE FROM quick_payment_records WHERE id = :paymentId")
     suspend fun deletePaymentById(paymentId: Long)
 
+    @Query("DELETE FROM quick_payment_records WHERE groupOrderId = :orderId")
+    suspend fun deletePaymentsForOrder(orderId: Long)
+
+    // Purchase Payments (Who paid the purchase bill upfront)
+    @Query("SELECT * FROM quick_purchase_payments WHERE groupOrderId = :orderId ORDER BY id ASC")
+    fun observePurchasePayments(orderId: Long): Flow<List<PurchasePaymentEntity>>
+
+    @Query("SELECT * FROM quick_purchase_payments WHERE groupOrderId = :orderId ORDER BY id ASC")
+    suspend fun getPurchasePayments(orderId: Long): List<PurchasePaymentEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPurchasePayments(payments: List<PurchasePaymentEntity>): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPurchasePayment(payment: PurchasePaymentEntity): Long
+
+    @Query("DELETE FROM quick_purchase_payments WHERE groupOrderId = :orderId")
+    suspend fun deletePurchasePaymentsForOrder(orderId: Long)
+
+    @Query("DELETE FROM quick_purchase_payments WHERE id = :paymentId")
+    suspend fun deletePurchasePaymentById(paymentId: Long)
+
     // Cascading delete for entire order
     @Transaction
     suspend fun deleteEntireGroupOrder(orderId: Long) {
         deleteAllocationsForOrder(orderId)
         deleteBillSummaryForOrder(orderId)
         deleteBillItemsForOrder(orderId)
+        deletePurchasePaymentsForOrder(orderId)
+        deletePaymentsForOrder(orderId)
         deleteOrder(orderId)
     }
 }

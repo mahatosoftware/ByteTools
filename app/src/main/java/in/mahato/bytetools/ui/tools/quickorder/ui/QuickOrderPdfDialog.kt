@@ -38,6 +38,8 @@ fun QuickOrderPdfExportBottomSheet(
     consolidatedItems: List<ConsolidatedItem>,
     billItems: List<BillItem>,
     payments: List<PaymentRecord>,
+    purchasePayments: List<PurchasePayment> = emptyList(),
+    settlementTransfers: List<SettlementTransfer> = emptyList(),
     navController: androidx.navigation.NavController? = null,
     onDismiss: () -> Unit
 ) {
@@ -77,7 +79,9 @@ fun QuickOrderPdfExportBottomSheet(
                         context = context,
                         order = order,
                         summary = summary!!,
-                        settlements = settlements
+                        settlements = settlements,
+                        purchasePayments = purchasePayments,
+                        settlementTransfers = settlementTransfers
                     )
                 }
                 PdfReportType.INDIVIDUAL_SETTLEMENT -> {
@@ -87,7 +91,8 @@ fun QuickOrderPdfExportBottomSheet(
                         context = context,
                         order = order,
                         settlement = pSettlement,
-                        payments = payments
+                        payments = payments,
+                        settlementTransfers = settlementTransfers
                     )
                 }
                 PdfReportType.FINAL_SHOP_BILL -> {

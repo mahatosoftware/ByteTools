@@ -30,9 +30,10 @@ import `in`.mahato.bytetools.ui.tools.quickorder.data.local.*
         BillItemEntity::class,
         ItemAllocationEntity::class,
         BillSummaryEntity::class,
-        PaymentRecordEntity::class
+        PaymentRecordEntity::class,
+        PurchasePaymentEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

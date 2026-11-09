@@ -122,12 +122,36 @@ data class PaymentRecord(
     val id: Long = 0,
     val groupOrderId: Long,
     val participantId: Long,
+    val toParticipantId: Long? = null, // null if paying organizer or generic pool
     val amountPaise: Long,
     val paymentMethod: String = "Cash", // Cash, UPI, Bank Transfer, Other
     val transactionReference: String? = null,
     val notes: String? = null,
     val paymentDate: Long = System.currentTimeMillis()
 )
+
+data class PurchasePayment(
+    val id: Long = 0,
+    val groupOrderId: Long,
+    val participantId: Long,
+    val participantName: String = "",
+    val amountPaise: Long,
+    val paymentMethod: String = "Cash",
+    val notes: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+data class SettlementTransfer(
+    val fromParticipantId: Long,
+    val fromParticipantName: String,
+    val toParticipantId: Long,
+    val toParticipantName: String,
+    val amountPaise: Long,
+    val settledPaise: Long = 0L,
+    val isFullySettled: Boolean = settledPaise >= amountPaise
+) {
+    val remainingPaise: Long get() = kotlin.math.max(0L, amountPaise - settledPaise)
+}
 
 data class SettlementItemBreakdown(
     val productName: String,
@@ -150,10 +174,13 @@ data class ParticipantSettlement(
     val overallDiscountSharePaise: Long,
     val taxSharePaise: Long,
     val additionalChargesSharePaise: Long,
-    val finalPayablePaise: Long,
-    val amountPaidPaise: Long,
-    val outstandingBalancePaise: Long,
-    val paymentStatus: PaymentStatus
+    val finalPayablePaise: Long, // Net consumed share
+    val paidForPurchasePaise: Long = 0L, // How much participant contributed upfront for the purchase
+    val netBalancePaise: Long = paidForPurchasePaise - finalPayablePaise, // >0: should receive back, <0: owes
+    val amountPaidPaise: Long = 0L, // Settlement payments sent
+    val amountReceivedPaise: Long = 0L, // Settlement payments received
+    val outstandingBalancePaise: Long = 0L,
+    val paymentStatus: PaymentStatus = PaymentStatus.PENDING
 )
 
 data class ReconciliationItem(

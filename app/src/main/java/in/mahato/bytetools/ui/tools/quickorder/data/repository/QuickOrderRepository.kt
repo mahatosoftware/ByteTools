@@ -45,6 +45,12 @@ interface QuickOrderRepository {
     suspend fun getPayments(orderId: Long): List<PaymentRecord>
     suspend fun recordPayment(payment: PaymentRecord): Long
     suspend fun deletePayment(paymentId: Long)
+
+    fun observePurchasePayments(orderId: Long): Flow<List<PurchasePayment>>
+    suspend fun getPurchasePayments(orderId: Long): List<PurchasePayment>
+    suspend fun savePurchasePayments(orderId: Long, payments: List<PurchasePayment>)
+    suspend fun addPurchasePayment(payment: PurchasePayment): Long
+    suspend fun deletePurchasePayment(paymentId: Long)
 }
 
 @Singleton
@@ -209,5 +215,26 @@ class QuickOrderRepositoryImpl @Inject constructor(
 
     override suspend fun deletePayment(paymentId: Long) {
         dao.deletePaymentById(paymentId)
+    }
+
+    override fun observePurchasePayments(orderId: Long): Flow<List<PurchasePayment>> {
+        return dao.observePurchasePayments(orderId).map { list -> list.map { it.toDomain() } }
+    }
+
+    override suspend fun getPurchasePayments(orderId: Long): List<PurchasePayment> {
+        return dao.getPurchasePayments(orderId).map { it.toDomain() }
+    }
+
+    override suspend fun savePurchasePayments(orderId: Long, payments: List<PurchasePayment>) {
+        dao.deletePurchasePaymentsForOrder(orderId)
+        dao.insertPurchasePayments(payments.map { PurchasePaymentEntity.fromDomain(it.copy(groupOrderId = orderId)) })
+    }
+
+    override suspend fun addPurchasePayment(payment: PurchasePayment): Long {
+        return dao.insertPurchasePayment(PurchasePaymentEntity.fromDomain(payment))
+    }
+
+    override suspend fun deletePurchasePayment(paymentId: Long) {
+        dao.deletePurchasePaymentById(paymentId)
     }
 }

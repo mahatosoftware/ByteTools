@@ -7,10 +7,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,14 +26,16 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import `in`.mahato.bytetools.ui.tools.quickorder.domain.engine.SmartSplitEngine
-import `in`.mahato.bytetools.ui.tools.quickorder.domain.model.ParticipantSettlement
-import `in`.mahato.bytetools.ui.tools.quickorder.domain.model.SplitMethod
+import `in`.mahato.bytetools.ui.tools.quickorder.domain.model.*
+import kotlin.math.abs
+import kotlin.math.roundToLong
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettlementDashboardScreen(
     orderId: Long,
@@ -51,13 +57,21 @@ fun SettlementDashboardScreen(
     val consolidatedItems by viewModel.consolidatedItems.collectAsState()
     val billItems by viewModel.billItems.collectAsState()
     val payments by viewModel.payments.collectAsState()
+    val purchasePayments by viewModel.purchasePayments.collectAsState()
+    val settlementTransfers by viewModel.settlementTransfers.collectAsState()
+
+    val curr = order?.currency ?: "₹"
+    val totalBill = summary?.finalBillAmountPaise ?: 0L
+    val totalAllocated = settlements.sumOf { it.finalPayablePaise }
+    val unallocated = totalBill - totalAllocated
 
     var showPdfExportSheet by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showEditPayersDialog by remember { mutableStateOf(false) }
 
     fun shareParticipantBreakdown(settlement: ParticipantSettlement) {
         val ord = order ?: return
-        val text = SmartSplitEngine.generateParticipantShareText(ord, settlement)
+        val text = SmartSplitEngine.generateParticipantShareText(ord, settlement, settlementTransfers)
         val sendIntent = Intent().apply {
             action = Intent.ACTION_SEND
             putExtra(Intent.EXTRA_TEXT, text)
@@ -69,7 +83,7 @@ fun SettlementDashboardScreen(
     fun shareAll() {
         val ord = order ?: return
         val sum = summary ?: return
-        val text = SmartSplitEngine.generateAllSettlementShareText(ord, sum, settlements)
+        val text = SmartSplitEngine.generateAllSettlementShareText(ord, sum, settlements, purchasePayments, settlementTransfers)
         val sendIntent = Intent().apply {
             action = Intent.ACTION_SEND
             putExtra(Intent.EXTRA_TEXT, text)
@@ -81,7 +95,7 @@ fun SettlementDashboardScreen(
     fun exportCsv() {
         val ord = order ?: return
         val sum = summary ?: return
-        val csv = SmartSplitEngine.generateCsvExport(ord, sum, settlements)
+        val csv = SmartSplitEngine.generateCsvExport(ord, sum, settlements, settlementTransfers)
         val sendIntent = Intent().apply {
             action = Intent.ACTION_SEND
             putExtra(Intent.EXTRA_TEXT, csv)
@@ -238,11 +252,6 @@ fun SettlementDashboardScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            val curr = order?.currency ?: "₹"
-            val totalBill = summary?.finalBillAmountPaise ?: 0L
-            val totalAllocated = settlements.sumOf { it.finalPayablePaise }
-            val unallocated = totalBill - totalAllocated
-
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -338,6 +347,185 @@ fun SettlementDashboardScreen(
                                     fontWeight = FontWeight.ExtraBold,
                                     color = PurplePrimary
                                 )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Purchase Paid By:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    val payersStr = if (purchasePayments.isNotEmpty()) {
+                                        purchasePayments.joinToString(", ") { pp ->
+                                            val name = settlements.firstOrNull { it.participantId == pp.participantId }?.participantName ?: "Member"
+                                            "$name (${SmartSplitEngine.formatPaise(pp.amountPaise, curr, includeDecimals = pp.amountPaise % 100 != 0L)})"
+                                        }
+                                    } else {
+                                        "${order?.organizerName ?: "Organizer"} (${SmartSplitEngine.formatPaise(totalBill, curr)})"
+                                    }
+                                    Text(
+                                        payersStr,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = PurplePrimary
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+                                OutlinedButton(
+                                    onClick = { showEditPayersDialog = true },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Edit Payers", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Settlement Plan (Who Pays Whom)
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Payments, contentDescription = null, tint = PurplePrimary, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Settlement Plan (Who Pays Whom)",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = PurpleBackground
+                                ) {
+                                    Text(
+                                        "${settlementTransfers.size} ${if (settlementTransfers.size == 1) "Transfer" else "Transfers"}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PurplePrimary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "Simplified transfers to settle all purchase debts with minimum transactions.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            if (settlementTransfers.isEmpty()) {
+                                Surface(
+                                    color = GreenBackground,
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = GreenSuccess, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("All members are fully settled! No payments required.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GreenSuccess)
+                                    }
+                                }
+                            } else {
+                                settlementTransfers.forEach { transfer ->
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(transfer.fromParticipantName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "pays", tint = PurplePrimary, modifier = Modifier.size(14.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(transfer.toParticipantName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                                }
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    "Amount: ${SmartSplitEngine.formatPaise(transfer.amountPaise, curr)}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                if (transfer.isFullySettled) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = GreenBackground
+                                                    ) {
+                                                        Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(Icons.Default.Check, contentDescription = null, tint = GreenSuccess, modifier = Modifier.size(12.dp))
+                                                            Spacer(modifier = Modifier.width(3.dp))
+                                                            Text("Settled", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GreenSuccess)
+                                                        }
+                                                    }
+                                                } else {
+                                                    Text(
+                                                        SmartSplitEngine.formatPaise(transfer.remainingPaise, curr),
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = PurplePrimary,
+                                                        fontSize = 14.sp
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    IconButton(
+                                                        onClick = {
+                                                            val text = "Hi ${transfer.fromParticipantName},\nPlease settle ${SmartSplitEngine.formatPaise(transfer.remainingPaise, curr)} with ${transfer.toParticipantName} for ${order?.orderName ?: "group purchase"}."
+                                                            val sendIntent = Intent().apply {
+                                                                action = Intent.ACTION_SEND
+                                                                putExtra(Intent.EXTRA_TEXT, text)
+                                                                type = "text/plain"
+                                                            }
+                                                            context.startActivity(Intent.createChooser(sendIntent, "Send Transfer Reminder"))
+                                                        },
+                                                        modifier = Modifier.size(28.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Share, contentDescription = "Share", tint = GreenSuccess, modifier = Modifier.size(16.dp))
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -457,7 +645,7 @@ fun SettlementDashboardScreen(
                 // Participant Breakdown Header
                 item {
                     Text(
-                        "Individual Payables (${settlements.size})",
+                        "Member Settlement Balances (${settlements.size})",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -468,10 +656,11 @@ fun SettlementDashboardScreen(
                     ParticipantSettlementCard(
                         settlement = s,
                         currency = curr,
+                        transfers = settlementTransfers,
                         onShare = { shareParticipantBreakdown(s) },
                         onCopy = {
                             val ord = order ?: return@ParticipantSettlementCard
-                            val text = SmartSplitEngine.generateParticipantShareText(ord, s)
+                            val text = SmartSplitEngine.generateParticipantShareText(ord, s, settlementTransfers)
                             clipboardManager.setText(AnnotatedString(text))
                             android.widget.Toast.makeText(context, "Copied breakdown for ${s.participantName}!", android.widget.Toast.LENGTH_SHORT).show()
                         }
@@ -495,8 +684,24 @@ fun SettlementDashboardScreen(
             consolidatedItems = consolidatedItems,
             billItems = billItems,
             payments = payments,
+            purchasePayments = purchasePayments,
+            settlementTransfers = settlementTransfers,
             navController = navController,
             onDismiss = { showPdfExportSheet = false }
+        )
+    }
+
+    if (showEditPayersDialog && order != null) {
+        EditPurchasePayersDialog(
+            order = order!!,
+            totalBillPaise = totalBill,
+            participants = participants,
+            currentPurchasePayments = purchasePayments,
+            onDismiss = { showEditPayersDialog = false },
+            onSave = { updatedPayments ->
+                viewModel.savePurchasePayments(orderId, updatedPayments)
+                showEditPayersDialog = false
+            }
         )
     }
 }
@@ -505,6 +710,7 @@ fun SettlementDashboardScreen(
 fun ParticipantSettlementCard(
     settlement: ParticipantSettlement,
     currency: String,
+    transfers: List<SettlementTransfer> = emptyList(),
     onShare: () -> Unit,
     onCopy: () -> Unit
 ) {
@@ -556,20 +762,93 @@ fun ParticipantSettlementCard(
                 }
 
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        SmartSplitEngine.formatPaise(settlement.finalPayablePaise, currency),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = PurplePrimary
-                    )
-                    val totalSavings = settlement.itemDiscountPaise + settlement.overallDiscountSharePaise
-                    if (totalSavings > 0L) {
+                    if (settlement.netBalancePaise > 0L) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = GreenBackground
+                        ) {
+                            Text(
+                                "Gets back +${SmartSplitEngine.formatPaise(settlement.netBalancePaise, currency)}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = GreenSuccess,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            "Save ${SmartSplitEngine.formatPaise(totalSavings, currency)}",
+                            "Share: ${SmartSplitEngine.formatPaise(settlement.finalPayablePaise, currency)} • Paid: ${SmartSplitEngine.formatPaise(settlement.paidForPurchasePaise, currency)}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = GreenSuccess,
-                            fontWeight = FontWeight.Bold
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    } else if (settlement.netBalancePaise < 0L) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = RedBackground
+                        ) {
+                            Text(
+                                "Owes ${SmartSplitEngine.formatPaise(kotlin.math.abs(settlement.netBalancePaise), currency)}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = RedDanger,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "Share: ${SmartSplitEngine.formatPaise(settlement.finalPayablePaise, currency)} • Paid: ${SmartSplitEngine.formatPaise(settlement.paidForPurchasePaise, currency)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = GreenBackground
+                        ) {
+                            Text(
+                                "Settled Up ✅",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = GreenSuccess,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "Share: ${SmartSplitEngine.formatPaise(settlement.finalPayablePaise, currency)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Peer Transfers Summary for this participant
+            val myPayTransfers = transfers.filter { it.fromParticipantId == settlement.participantId }
+            val myReceiveTransfers = transfers.filter { it.toParticipantId == settlement.participantId }
+
+            if (myPayTransfers.isNotEmpty() || myReceiveTransfers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                        myPayTransfers.forEach { t ->
+                            val settledSuffix = if (t.isFullySettled) " (Settled ✅)" else ""
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("👉 Pay ", fontSize = 11.sp, color = RedDanger, fontWeight = FontWeight.Bold)
+                                Text("${SmartSplitEngine.formatPaise(t.amountPaise, currency)} to ${t.toParticipantName}$settledSuffix", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        myReceiveTransfers.forEach { t ->
+                            val settledSuffix = if (t.isFullySettled) " (Received ✅)" else ""
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("👉 Receive ", fontSize = 11.sp, color = GreenSuccess, fontWeight = FontWeight.Bold)
+                                Text("${SmartSplitEngine.formatPaise(t.amountPaise, currency)} from ${t.fromParticipantName}$settledSuffix", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                     }
                 }
             }
@@ -608,7 +887,7 @@ fun ParticipantSettlementCard(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     settlement.items.forEach { item ->
-                        val qtyStr = if (item.quantity % 1.0 == 0.0) item.quantity.toInt().toString() else String.format("%.1f", item.quantity)
+                        val qtyStr = if (item.quantity % 1.0 == 0.0) item.quantity.toInt().toString() else String.format(java.util.Locale.US, "%.1f", item.quantity)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -652,8 +931,293 @@ fun ParticipantSettlementCard(
                             Text("+${SmartSplitEngine.formatPaise(extra, currency)}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Your Cost Share:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        Text(SmartSplitEngine.formatPaise(settlement.finalPayablePaise, currency), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = PurplePrimary)
+                    }
+
+                    if (settlement.paidForPurchasePaise > 0L) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Paid Upfront for Purchase:", style = MaterialTheme.typography.bodySmall)
+                            Text(SmartSplitEngine.formatPaise(settlement.paidForPurchasePaise, currency), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        val netLabel = if (settlement.netBalancePaise > 0L) "Net to Receive:" else if (settlement.netBalancePaise < 0L) "Net Due to Pay:" else "Net Settlement:"
+                        val netColor = if (settlement.netBalancePaise > 0L) GreenSuccess else if (settlement.netBalancePaise < 0L) RedDanger else PurplePrimary
+                        Text(netLabel, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            SmartSplitEngine.formatPaise(kotlin.math.abs(settlement.netBalancePaise), currency),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = netColor
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun EditPurchasePayersDialog(
+    order: GroupOrder,
+    totalBillPaise: Long,
+    participants: List<Participant>,
+    currentPurchasePayments: List<PurchasePayment>,
+    onDismiss: () -> Unit,
+    onSave: (List<PurchasePayment>) -> Unit
+) {
+    val curr = order.currency
+    var isMultiple by remember {
+        mutableStateOf(currentPurchasePayments.size > 1)
+    }
+    var singlePayerId by remember {
+        val initialId = if (currentPurchasePayments.isNotEmpty()) {
+            currentPurchasePayments.first().participantId
+        } else {
+            participants.firstOrNull { it.isOrganizer }?.id ?: participants.firstOrNull()?.id ?: 0L
+        }
+        mutableStateOf(initialId)
+    }
+
+    val amounts = remember {
+        val map = mutableStateMapOf<Long, String>()
+        if (currentPurchasePayments.isNotEmpty()) {
+            currentPurchasePayments.forEach {
+                map[it.participantId] = if (it.amountPaise % 100L == 0L) (it.amountPaise / 100L).toString() else (it.amountPaise / 100.0).toString()
+            }
+        } else {
+            map[singlePayerId] = if (totalBillPaise % 100L == 0L) (totalBillPaise / 100L).toString() else (totalBillPaise / 100.0).toString()
+        }
+        map
+    }
+
+    val methods = remember {
+        val map = mutableStateMapOf<Long, String>()
+        currentPurchasePayments.forEach { map[it.participantId] = it.paymentMethod }
+        map
+    }
+
+    val totalEnteredPaise = if (!isMultiple) {
+        totalBillPaise
+    } else {
+        participants.sumOf { p ->
+            val text = amounts[p.id] ?: ""
+            ((text.replace(',', '.').toDoubleOrNull() ?: 0.0) * 100).roundToLong()
+        }
+    }
+    val diffPaise = totalBillPaise - totalEnteredPaise
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Payments, contentDescription = null, tint = PurplePrimary, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Edit Purchase Payers", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "Capture how much different people paid towards the purchase bill of ${SmartSplitEngine.formatPaise(totalBillPaise, curr)}.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = !isMultiple,
+                        onClick = { isMultiple = false },
+                        label = { Text("Single Person", fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = PurplePrimary,
+                            selectedLabelColor = Color.White
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = isMultiple,
+                        onClick = {
+                            isMultiple = true
+                            if (amounts.isEmpty() && singlePayerId != 0L) {
+                                val amtStr = if (totalBillPaise % 100L == 0L) (totalBillPaise / 100L).toString() else (totalBillPaise / 100.0).toString()
+                                amounts[singlePayerId] = amtStr
+                            }
+                        },
+                        label = { Text("Multiple People", fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = PurplePrimary,
+                            selectedLabelColor = Color.White
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (!isMultiple) {
+                    Text("Select Payer:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        participants.forEach { p ->
+                            FilterChip(
+                                selected = singlePayerId == p.id,
+                                onClick = { singlePayerId = p.id },
+                                label = { Text(if (p.isOrganizer) "${p.name} (Org)" else p.name, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = PurpleBackground,
+                                    selectedLabelColor = PurplePrimary
+                                )
+                            )
+                        }
+                    }
+                    val payerName = participants.firstOrNull { it.id == singlePayerId }?.name ?: "Organizer"
+                    Text(
+                        "$payerName paid ${SmartSplitEngine.formatPaise(totalBillPaise, curr)} (100%)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = PurplePrimary
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Amounts paid by members:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        TextButton(
+                            onClick = {
+                                if (participants.isNotEmpty()) {
+                                    val split = SmartSplitEngine.distributePaiseEqually(totalBillPaise, participants.map { it.id })
+                                    split.forEach { (id, paise) ->
+                                        amounts[id] = if (paise % 100L == 0L) (paise / 100L).toString() else (paise / 100.0).toString()
+                                    }
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text("Split Equally", fontSize = 11.sp, color = PurplePrimary)
+                        }
+                    }
+
+                    participants.forEach { p ->
+                        val amt = amounts[p.id] ?: ""
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(p.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                    TextButton(
+                                        onClick = {
+                                            val otherSum = participants.filter { it.id != p.id }.sumOf { other ->
+                                                val t = amounts[other.id] ?: ""
+                                                ((t.replace(',', '.').toDoubleOrNull() ?: 0.0) * 100).roundToLong()
+                                            }
+                                            val rem = kotlin.math.max(0L, totalBillPaise - otherSum)
+                                            amounts[p.id] = if (rem % 100L == 0L) (rem / 100L).toString() else (rem / 100.0).toString()
+                                        },
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Text("Fill Rem.", fontSize = 10.sp, color = PurplePrimary)
+                                    }
+                                }
+                                OutlinedTextField(
+                                    value = amt,
+                                    onValueChange = { amounts[p.id] = it },
+                                    label = { Text("Amount ($curr)") },
+                                    placeholder = { Text("0") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (diffPaise == 0L) GreenBackground else AmberBackground,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Total: ${SmartSplitEngine.formatPaise(totalEnteredPaise, curr)}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (diffPaise == 0L) GreenSuccess else AmberWarning
+                            )
+                            Text(
+                                if (diffPaise == 0L) "Balanced ✅" else "Diff: ${SmartSplitEngine.formatPaise(diffPaise, curr)}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (diffPaise == 0L) GreenSuccess else AmberWarning
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val result = if (!isMultiple) {
+                        val pName = participants.firstOrNull { it.id == singlePayerId }?.name ?: "Organizer"
+                        listOf(
+                            PurchasePayment(
+                                groupOrderId = order.id,
+                                participantId = singlePayerId,
+                                participantName = pName,
+                                amountPaise = totalBillPaise,
+                                paymentMethod = "Cash"
+                            )
+                        )
+                    } else {
+                        participants.mapNotNull { p ->
+                            val text = amounts[p.id] ?: ""
+                            val paise = ((text.replace(',', '.').toDoubleOrNull() ?: 0.0) * 100).roundToLong()
+                            if (paise > 0L) {
+                                PurchasePayment(
+                                    groupOrderId = order.id,
+                                    participantId = p.id,
+                                    participantName = p.name,
+                                    amountPaise = paise,
+                                    paymentMethod = methods[p.id] ?: "Cash"
+                                )
+                            } else null
+                        }
+                    }
+                    onSave(result)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
+            ) {
+                Text("Save Payers", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
