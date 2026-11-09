@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -141,7 +143,7 @@ fun ConsolidatedListScreen(
                     ) {
                         Text("Enter Shop Bill", fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -156,14 +158,7 @@ fun ConsolidatedListScreen(
             OrderStepIndicator(
                 currentStep = 2,
                 onStepClick = { step ->
-                    when (step) {
-                        1 -> navController.navigate("collect_orders/$orderId")
-                        2 -> { /* current screen */ }
-                        3 -> navController.navigate("enter_bill/$orderId")
-                        4 -> if (order?.status == `in`.mahato.bytetools.ui.tools.quickorder.domain.model.OrderStatus.RECONCILED || order?.status == `in`.mahato.bytetools.ui.tools.quickorder.domain.model.OrderStatus.SETTLED) navController.navigate("reconciliation/$orderId")
-                        5 -> if (order?.status == `in`.mahato.bytetools.ui.tools.quickorder.domain.model.OrderStatus.RECONCILED || order?.status == `in`.mahato.bytetools.ui.tools.quickorder.domain.model.OrderStatus.SETTLED) navController.navigate("settlement_dashboard/$orderId")
-                        6 -> if (order?.status == `in`.mahato.bytetools.ui.tools.quickorder.domain.model.OrderStatus.SETTLED) navController.navigate("payment_tracking/$orderId")
-                    }
+                    navigateToWizardStep(navController, orderId, step, isFinalized = order?.status == `in`.mahato.bytetools.ui.tools.quickorder.domain.model.OrderStatus.RECONCILED || order?.status == `in`.mahato.bytetools.ui.tools.quickorder.domain.model.OrderStatus.SETTLED)
                 },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
@@ -320,6 +315,9 @@ fun ConsolidatedListScreen(
             billItems = billItems,
             payments = payments,
             navController = navController,
+            onWriteOffDifference = { newFinal ->
+                viewModel.writeOffUnallocatedDifference(orderId, newFinal)
+            },
             onDismiss = { showPdfExportSheet = false }
         )
     }

@@ -2,6 +2,7 @@ package `in`.mahato.bytetools.ui.tools.quickorder.ui
 
 import android.content.Intent
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.FactCheck
+import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -68,6 +72,7 @@ fun SettlementDashboardScreen(
     var showPdfExportSheet by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showEditPayersDialog by remember { mutableStateOf(false) }
+    var showWriteOffDialog by remember { mutableStateOf(false) }
 
     fun shareParticipantBreakdown(settlement: ParticipantSettlement) {
         val ord = order ?: return
@@ -142,7 +147,7 @@ fun SettlementDashboardScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("View Shopkeeper Bill") },
-                                leadingIcon = { Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = PurplePrimary) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, tint = PurplePrimary) },
                                 onClick = {
                                     showMenu = false
                                     navController.navigate("enter_bill/$orderId")
@@ -150,7 +155,7 @@ fun SettlementDashboardScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text("View Reconciliation") },
-                                leadingIcon = { Icon(Icons.Default.FactCheck, contentDescription = null, tint = PurplePrimary) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.FactCheck, contentDescription = null, tint = PurplePrimary) },
                                 onClick = {
                                     showMenu = false
                                     navController.navigate("reconciliation/$orderId")
@@ -158,7 +163,7 @@ fun SettlementDashboardScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text("View Consolidated List") },
-                                leadingIcon = { Icon(Icons.Default.ListAlt, contentDescription = null, tint = PurplePrimary) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.ListAlt, contentDescription = null, tint = PurplePrimary) },
                                 onClick = {
                                     showMenu = false
                                     navController.navigate("consolidated_list/$orderId")
@@ -239,16 +244,7 @@ fun SettlementDashboardScreen(
         ) {
             OrderStepIndicator(
                 currentStep = 5,
-                onStepClick = { step ->
-                    when (step) {
-                        1 -> navController.navigate("collect_orders/$orderId")
-                        2 -> navController.navigate("consolidated_list/$orderId")
-                        3 -> navController.navigate("enter_bill/$orderId")
-                        4 -> navController.navigate("reconciliation/$orderId")
-                        5 -> { /* current screen */ }
-                        6 -> navController.navigate("payment_tracking/$orderId")
-                    }
-                },
+                onStepClick = { step -> navigateToWizardStep(navController, orderId, step, isFinalized = true) },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
@@ -347,6 +343,92 @@ fun SettlementDashboardScreen(
                                     fontWeight = FontWeight.ExtraBold,
                                     color = PurplePrimary
                                 )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Allocated to Members:", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    SmartSplitEngine.formatPaise(totalAllocated, curr),
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (unallocated == 0L) GreenSuccess else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            if (unallocated != 0L) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = AmberBackground,
+                                    border = BorderStroke(1.dp, AmberWarning.copy(alpha = 0.5f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.Warning,
+                                                    contentDescription = null,
+                                                    tint = AmberWarning,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    "Unallocated Difference",
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = AmberWarning
+                                                )
+                                            }
+                                            Text(
+                                                (if (unallocated > 0L) "+" else "") + SmartSplitEngine.formatPaise(unallocated, curr),
+                                                fontWeight = FontWeight.ExtraBold,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = AmberWarning
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            if (unallocated > 0L) {
+                                                "Bill total (${SmartSplitEngine.formatPaise(totalBill, curr)}) is higher than member allocations (${SmartSplitEngine.formatPaise(totalAllocated, curr)})."
+                                            } else {
+                                                "Member allocations (${SmartSplitEngine.formatPaise(totalAllocated, curr)}) exceed bill total (${SmartSplitEngine.formatPaise(totalBill, curr)})."
+                                            },
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Button(
+                                            onClick = { showWriteOffDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = AmberWarning),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(36.dp)
+                                        ) {
+                                            Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                "Write Off on Final Amount",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -575,7 +657,7 @@ fun SettlementDashboardScreen(
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = PurplePrimary, modifier = Modifier.size(20.dp))
+                                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, tint = PurplePrimary, modifier = Modifier.size(20.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text("Shop Bill", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = PurpleDark)
                                         }
@@ -592,7 +674,7 @@ fun SettlementDashboardScreen(
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.FactCheck, contentDescription = null, tint = Color(0xFF00796B), modifier = Modifier.size(20.dp))
+                                            Icon(Icons.AutoMirrored.Filled.FactCheck, contentDescription = null, tint = Color(0xFF00796B), modifier = Modifier.size(20.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text("Reconciliation", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF004D40))
                                         }
@@ -687,6 +769,9 @@ fun SettlementDashboardScreen(
             purchasePayments = purchasePayments,
             settlementTransfers = settlementTransfers,
             navController = navController,
+            onWriteOffDifference = { newFinal ->
+                viewModel.writeOffUnallocatedDifference(orderId, newFinal)
+            },
             onDismiss = { showPdfExportSheet = false }
         )
     }
@@ -701,6 +786,80 @@ fun SettlementDashboardScreen(
             onSave = { updatedPayments ->
                 viewModel.savePurchasePayments(orderId, updatedPayments)
                 showEditPayersDialog = false
+            }
+        )
+    }
+
+    if (showWriteOffDialog) {
+        AlertDialog(
+            onDismissRequest = { showWriteOffDialog = false },
+            icon = {
+                Icon(Icons.Default.AutoFixHigh, contentDescription = null, tint = PurplePrimary, modifier = Modifier.size(28.dp))
+            },
+            title = {
+                Text("Write Off Unallocated Difference?", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Writing off will adjust the grand total payable from ${SmartSplitEngine.formatPaise(totalBill, curr)} to ${SmartSplitEngine.formatPaise(totalAllocated, curr)} to match the exact member allocations.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Current Bill Total:", fontSize = 12.sp)
+                                Text(SmartSplitEngine.formatPaise(totalBill, curr), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Member Allocations:", fontSize = 12.sp)
+                                Text(SmartSplitEngine.formatPaise(totalAllocated, curr), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = GreenSuccess)
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Difference to Write Off:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = AmberWarning)
+                                Text(
+                                    (if (unallocated > 0L) "-" else "+") + SmartSplitEngine.formatPaise(abs(unallocated), curr),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 12.sp,
+                                    color = AmberWarning
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        "After write-off, the settlement will be 100% balanced and ready for payment tracking or PDF export.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.writeOffUnallocatedDifference(orderId, totalAllocated)
+                        showWriteOffDialog = false
+                        android.widget.Toast.makeText(
+                            context,
+                            "Unallocated difference written off! Final amount is now ${SmartSplitEngine.formatPaise(totalAllocated, curr)}.",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
+                ) {
+                    Text("Write Off", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWriteOffDialog = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }

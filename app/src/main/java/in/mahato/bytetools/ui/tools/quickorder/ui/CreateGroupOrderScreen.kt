@@ -10,6 +10,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -141,7 +143,7 @@ fun CreateGroupOrderScreen(
                         onValueChange = { description = it },
                         label = { Text("Group Description (Optional)") },
                         placeholder = { Text("e.g. Crackers purchase from Sivakasi store") },
-                        leadingIcon = { Icon(Icons.Default.Notes, contentDescription = null, tint = PurplePrimary) },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null, tint = PurplePrimary) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
@@ -339,7 +341,7 @@ fun CreateGroupOrderScreen(
                     color = Color.White
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White)
             }
 
             Spacer(modifier = Modifier.height(30.dp))

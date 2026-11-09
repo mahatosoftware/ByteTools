@@ -1,6 +1,7 @@
 package `in`.mahato.bytetools.ui.tools.quickorder.ui
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -154,7 +156,7 @@ fun CollectOrdersScreen(
                     ) {
                         Text("Consolidated List", fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -166,7 +168,11 @@ fun CollectOrdersScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            OrderStepIndicator(currentStep = 1, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            OrderStepIndicator(
+                currentStep = 1,
+                onStepClick = { step -> navigateToWizardStep(navController, orderId, step) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
 
             // Participant Tabs / Selector
             LazyRow(
@@ -180,7 +186,9 @@ fun CollectOrdersScreen(
                     Surface(
                         onClick = { selectedParticipantId = p.id },
                         shape = RoundedCornerShape(20.dp),
-                        color = if (isSelected) PurplePrimary else MaterialTheme.colorScheme.surfaceVariant,
+                        color = if (isSelected) PurplePrimary else MaterialTheme.colorScheme.surface,
+                        border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        shadowElevation = if (isSelected) 2.dp else 0.dp,
                         modifier = Modifier.height(38.dp)
                     ) {
                         Row(

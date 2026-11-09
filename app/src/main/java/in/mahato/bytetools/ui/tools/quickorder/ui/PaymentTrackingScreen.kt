@@ -127,24 +127,25 @@ fun PaymentTrackingScreen(
         ) {
             OrderStepIndicator(
                 currentStep = 6,
-                onStepClick = { step ->
-                    when (step) {
-                        1 -> navController.navigate("collect_orders/$orderId")
-                        2 -> navController.navigate("consolidated_list/$orderId")
-                        3 -> navController.navigate("enter_bill/$orderId")
-                        4 -> navController.navigate("reconciliation/$orderId")
-                        5 -> navController.navigate("settlement_dashboard/$orderId")
-                        6 -> { /* current screen */ }
-                    }
-                },
+                onStepClick = { step -> navigateToWizardStep(navController, orderId, step, isFinalized = true) },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.weight(1f)
-            ) {
+            if (settlements.isEmpty()) {
+                EmptyQuickOrderView(
+                    icon = Icons.Default.Payments,
+                    title = "No Settlements Calculated",
+                    subtitle = "Complete Step 5 & 6 (Reconciliation & Smart Split) to calculate settlement amounts before tracking payments.",
+                    actionButtonText = "View Settlements",
+                    onActionClick = { navController.navigate("settlement_dashboard/$orderId") },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
                 // Progress Banner
                 item {
                     Card(
@@ -641,6 +642,7 @@ fun PaymentTrackingScreen(
                 item {
                     Spacer(modifier = Modifier.height(20.dp))
                 }
+            }
             }
         }
     }

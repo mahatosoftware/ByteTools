@@ -450,16 +450,7 @@ fun EnterBillScreen(
         ) {
             OrderStepIndicator(
                 currentStep = 3,
-                onStepClick = { step ->
-                    when (step) {
-                        1 -> navController.navigate("collect_orders/$orderId")
-                        2 -> navController.navigate("consolidated_list/$orderId")
-                        3 -> { /* current screen */ }
-                        4 -> if (isFinalized) navController.navigate("reconciliation/$orderId")
-                        5 -> if (isFinalized) navController.navigate("settlement_dashboard/$orderId")
-                        6 -> if (isFinalized) navController.navigate("payment_tracking/$orderId")
-                    }
-                },
+                onStepClick = { step -> navigateToWizardStep(navController, orderId, step, isFinalized) },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
@@ -1088,9 +1079,9 @@ fun EnterBillScreen(
                                         onClick = { if (!isFinalized) isMultiplePayers = false },
                                         enabled = !isFinalized,
                                         label = { Text("Single Person Paid (100%)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-                                        leadingIcon = {
-                                            if (!isMultiplePayers) Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp)) else null
-                                        },
+                                        leadingIcon = if (!isMultiplePayers) {
+                                            { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                        } else null,
                                         colors = FilterChipDefaults.filterChipColors(
                                             selectedContainerColor = PurplePrimary,
                                             selectedLabelColor = Color.White
@@ -1110,9 +1101,9 @@ fun EnterBillScreen(
                                         },
                                         enabled = !isFinalized,
                                         label = { Text("Multiple People Paid", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-                                        leadingIcon = {
-                                            if (isMultiplePayers) Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(14.dp)) else null
-                                        },
+                                        leadingIcon = if (isMultiplePayers) {
+                                            { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                        } else null,
                                         colors = FilterChipDefaults.filterChipColors(
                                             selectedContainerColor = PurplePrimary,
                                             selectedLabelColor = Color.White

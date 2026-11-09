@@ -250,6 +250,28 @@ class QuickOrderViewModel @Inject constructor(
         }
     }
 
+    fun writeOffUnallocatedDifference(orderId: Long, newFinalBillPaise: Long) {
+        viewModelScope.launch {
+            val currentSummary = repository.getBillSummary(orderId) ?: return@launch
+            val updatedSummary = currentSummary.copy(finalBillAmountPaise = newFinalBillPaise)
+            repository.saveBillSummary(updatedSummary)
+
+            val order = repository.getOrderById(orderId)
+            if (order != null) {
+                repository.updateOrder(order.copy(finalBillAmountPaise = newFinalBillPaise))
+            }
+
+            // If there's a single purchase payment representing the previous bill total, update it too
+            val pPayments = repository.getPurchasePayments(orderId)
+            if (pPayments.size == 1 && pPayments.first().amountPaise == currentSummary.finalBillAmountPaise) {
+                repository.savePurchasePayments(
+                    orderId,
+                    listOf(pPayments.first().copy(amountPaise = newFinalBillPaise))
+                )
+            }
+        }
+    }
+
     fun savePurchasePayments(orderId: Long, payments: List<PurchasePayment>) {
         viewModelScope.launch {
             repository.savePurchasePayments(orderId, payments)

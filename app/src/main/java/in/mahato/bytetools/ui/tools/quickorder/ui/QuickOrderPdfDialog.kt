@@ -41,6 +41,7 @@ fun QuickOrderPdfExportBottomSheet(
     purchasePayments: List<PurchasePayment> = emptyList(),
     settlementTransfers: List<SettlementTransfer> = emptyList(),
     navController: androidx.navigation.NavController? = null,
+    onWriteOffDifference: ((Long) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -235,13 +236,41 @@ fun QuickOrderPdfExportBottomSheet(
                     color = RedBackground,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        validationError ?: "",
-                        color = RedDanger,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(10.dp)
-                    )
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            validationError ?: "",
+                            color = RedDanger,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        if (kotlin.math.abs(unallocatedDiff) > 0L && onWriteOffDifference != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    onWriteOffDifference(totalAllocated)
+                                    validationError = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = RedDanger),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoFixHigh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Write Off Difference (${SmartSplitEngine.formatPaise(unallocatedDiff, order.currency)})",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

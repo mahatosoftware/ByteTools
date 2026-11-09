@@ -699,4 +699,58 @@ class SmartSplitEngineTest {
         assertEquals(1L, transfers[0].toParticipantId)   // Alice
         assertEquals(100000L, transfers[0].amountPaise)
     }
+
+    // =========================================================================
+    // Test 17: Unallocated difference detection and write-off on final amount
+    // When final bill differs from sum of allocated payable amounts, writing off
+    // aligns finalBillAmountPaise with totalAllocated to achieve 100% balance.
+    // =========================================================================
+    @Test
+    fun test17_unallocatedDifferenceWriteOffOnFinalAmount() {
+        val alice = Participant(id = 1L, groupOrderId = 1L, name = "Alice", isOrganizer = true)
+        val bob = Participant(id = 2L, groupOrderId = 1L, name = "Bob", isOrganizer = false)
+        val participants = listOf(alice, bob)
+
+        val billItems = listOf(
+            BillItem(id = 1L, groupOrderId = 1L, productName = "Item A", quantity = 1.0, unitPricePaise = 100000L), // ₹1,000
+            BillItem(id = 2L, groupOrderId = 1L, productName = "Item B", quantity = 1.0, unitPricePaise = 100000L)  // ₹1,000
+        )
+
+        val allocations = listOf(
+            ItemAllocation(id = 1L, groupOrderId = 1L, billItemId = 1L, participantId = 1L, allocatedQuantity = 1.0),
+            ItemAllocation(id = 2L, groupOrderId = 1L, billItemId = 2L, participantId = 2L, allocatedQuantity = 1.0)
+        )
+
+        // Initial summary with cashier round-off / discrepancy: final bill ₹2,050 vs items ₹2,000
+        val initialSummary = BillSummary(
+            id = 1L,
+            groupOrderId = 1L,
+            subtotalPaise = 200000L,
+            overallDiscountPaise = 0L,
+            finalBillAmountPaise = 205000L // ₹2,050
+        )
+
+        val initialSettlements = SmartSplitEngine.calculateSettlement(billItems, allocations, initialSummary, participants)
+        val totalAllocated = initialSettlements.sumOf { it.finalPayablePaise }
+        val unallocatedDiff = initialSummary.finalBillAmountPaise - totalAllocated
+
+        // Verify unallocated difference is detected
+        assertEquals(200000L, totalAllocated)
+        assertEquals(5000L, unallocatedDiff) // ₹50 difference
+
+        // Perform Write-Off: adjust finalBillAmountPaise to equal totalAllocated
+        val writtenOffSummary = initialSummary.copy(finalBillAmountPaise = totalAllocated)
+        val balancedSettlements = SmartSplitEngine.calculateSettlement(billItems, allocations, writtenOffSummary, participants)
+        val newTotalAllocated = balancedSettlements.sumOf { it.finalPayablePaise }
+        val balancedDiff = writtenOffSummary.finalBillAmountPaise - newTotalAllocated
+
+        // Settlement is now 100% balanced
+        assertEquals(0L, balancedDiff)
+        assertEquals(writtenOffSummary.finalBillAmountPaise, newTotalAllocated)
+
+        val transfers = SmartSplitEngine.calculateSettlementTransfers(balancedSettlements)
+        assertEquals(1, transfers.size)
+        assertEquals(2L, transfers[0].fromParticipantId) // Bob pays Alice
+        assertEquals(100000L, transfers[0].amountPaise)
+    }
 }

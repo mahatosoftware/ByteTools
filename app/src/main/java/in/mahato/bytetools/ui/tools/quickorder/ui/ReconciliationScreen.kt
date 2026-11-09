@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,7 +37,6 @@ fun ReconciliationScreen(
     val order by viewModel.activeOrder.collectAsState()
     val participants by viewModel.participants.collectAsState()
     val billItems by viewModel.billItems.collectAsState()
-    val consolidatedItems by viewModel.consolidatedItems.collectAsState()
     val initialReconItems by viewModel.reconciliationItems.collectAsState()
     val billSummary by viewModel.billSummary.collectAsState()
 
@@ -189,16 +189,7 @@ fun ReconciliationScreen(
         ) {
             OrderStepIndicator(
                 currentStep = 4,
-                onStepClick = { step ->
-                    when (step) {
-                        1 -> navController.navigate("collect_orders/$orderId")
-                        2 -> navController.navigate("consolidated_list/$orderId")
-                        3 -> navController.navigate("enter_bill/$orderId")
-                        4 -> { /* current screen */ }
-                        5 -> if (isFinalized) navController.navigate("settlement_dashboard/$orderId")
-                        6 -> if (isFinalized) navController.navigate("payment_tracking/$orderId")
-                    }
-                },
+                onStepClick = { step -> navigateToWizardStep(navController, orderId, step, isFinalized) },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
@@ -246,12 +237,22 @@ fun ReconciliationScreen(
                 }
             }
 
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                itemsIndexed(initialReconItems) { _, recon ->
+            if (initialReconItems.isEmpty()) {
+                EmptyQuickOrderView(
+                    icon = Icons.AutoMirrored.Filled.ReceiptLong,
+                    title = "No Bill Items to Reconcile",
+                    subtitle = "Please enter the shopkeeper bill or scan a receipt first before allocating items.",
+                    actionButtonText = "Enter Shop Bill",
+                    onActionClick = { navController.navigate("enter_bill/$orderId") },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    itemsIndexed(initialReconItems) { _, recon ->
                     ReconciliationItemCard(
                         recon = recon,
                         participants = participants,
@@ -289,6 +290,7 @@ fun ReconciliationScreen(
                     Spacer(modifier = Modifier.height(20.dp))
                 }
             }
+            }
         }
     }
 }
@@ -324,7 +326,7 @@ fun ReconciliationItemCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Ordered: ${recon.orderedQuantity} ${recon.billItem.unit} | Purchased: ${recon.purchasedQuantity} ${recon.billItem.unit}",
+                        "Ordered: ${recon.orderedQuantity} ${recon.billItem.unit} • Purchased: ${recon.purchasedQuantity} ${recon.billItem.unit} (${SmartSplitEngine.formatPaise(recon.billItem.totalPricePaise, currency)})",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
