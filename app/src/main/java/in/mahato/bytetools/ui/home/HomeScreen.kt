@@ -467,6 +467,8 @@ fun getToolNameFromRoute(route: String): String {
         Screen.AudioRecorder.route -> "Audio Recorder"
         Screen.AudioHistory.route -> "Audio History"
         Screen.QuickOrderDashboard.route -> "Group Shopping with Smart Split"
+        Screen.WorldClock.route -> "World Clock"
+        Screen.PasswordGenerator.route -> "Password Generator"
         // add more specific routes as needed based on the AppNavigation map
         else -> ""
     }
@@ -496,6 +498,8 @@ fun getIconForRoute(route: String): ImageVector? {
         Screen.RingtoneMaker.route -> Icons.Default.NotificationsActive
         Screen.AudioRecorder.route -> Icons.Default.Mic
         Screen.AudioHistory.route -> Icons.Default.History
+        Screen.WorldClock.route -> Icons.Default.Public
+        Screen.PasswordGenerator.route -> Icons.Default.Password
         else -> null
     }
 }

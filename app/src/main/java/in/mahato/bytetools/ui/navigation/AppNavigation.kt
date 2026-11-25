@@ -27,6 +27,7 @@ import `in`.mahato.bytetools.ui.tools.device.DeviceInfoScreen
 import `in`.mahato.bytetools.ui.tools.calculator.CalculatorScreen
 import `in`.mahato.bytetools.ui.tools.age.AgeCalculatorScreen
 import `in`.mahato.bytetools.ui.tools.dateduration.DateDurationScreen
+import `in`.mahato.bytetools.ui.tools.worldclock.WorldClockScreen
 import `in`.mahato.bytetools.ui.tools.gps.GPSDashboardScreen
 import `in`.mahato.bytetools.ui.tools.gps.location.LiveLocationScreen
 import `in`.mahato.bytetools.ui.tools.gps.location.ParkingLocationScreen
@@ -55,6 +56,7 @@ import `in`.mahato.bytetools.ui.tools.network.*
 import `in`.mahato.bytetools.ui.tools.audio.*
 import androidx.hilt.navigation.compose.hiltViewModel
 import `in`.mahato.bytetools.ui.tools.quickorder.ui.*
+import `in`.mahato.bytetools.ui.tools.password.PasswordGeneratorScreen
 
 @Composable
 fun AppNavigation(
@@ -92,6 +94,8 @@ fun AppNavigation(
         composable(Screen.Calculator.route) { CalculatorScreen(navController) }
         composable(Screen.AgeCalculator.route) { AgeCalculatorScreen(navController) }
         composable(Screen.DateDuration.route) { DateDurationScreen(navController) }
+        composable(Screen.WorldClock.route) { WorldClockScreen(navController) }
+        composable(Screen.PasswordGenerator.route) { PasswordGeneratorScreen(navController) }
         
         // Group 5: GPS Utilities Pack
         composable(Screen.GPSDashboard.route) { GPSDashboardScreen(navController) }

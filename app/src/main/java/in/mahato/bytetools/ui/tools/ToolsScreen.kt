@@ -48,7 +48,9 @@ fun ToolsScreen(navController: NavController) {
             ToolItem("Magnifier", "Zoom in on small text", Icons.Default.ZoomIn, Screen.Magnifier.route, "Quick", Color(0xFFF3E5F5), Color(0xFF9C27B0)),
             ToolItem("Direct WhatsApp", "Direct message anyone", Icons.Default.Chat, Screen.DirectWhatsApp.route, "Quick", Color(0xFFE8F5E9), Color(0xFF4CAF50)),
             ToolItem("Age Calculator", "Birth date helper", Icons.Default.Cake, Screen.AgeCalculator.route, "Productivity", Color(0xFFFBE9E7), Color(0xFFFF5722)),
-            ToolItem("Date Duration", "Calculate days between dates", Icons.Default.DateRange, Screen.DateDuration.route, "Productivity", Color(0xFFFFF3E0), Color(0xFFFF9800))
+            ToolItem("Date Duration", "Calculate days between dates", Icons.Default.DateRange, Screen.DateDuration.route, "Productivity", Color(0xFFFFF3E0), Color(0xFFFF9800)),
+            ToolItem("World Clock", "Time zones, converter & diff", Icons.Default.Public, Screen.WorldClock.route, "Productivity", Color(0xFFE0F7FA), Color(0xFF00838F)),
+            ToolItem("Password Generator", "Secure offline passwords", Icons.Default.Password, Screen.PasswordGenerator.route, "Productivity", Color(0xFFE8EAF6), Color(0xFF3F51B5))
         )),
         ToolGroup("Measurement Tools", "Precise measuring utility", listOf(
             ToolItem("Unit Converter", "Convert anything", Icons.Default.SyncAlt, Screen.UnitConverter.route, "Measurement", Color(0xFFF1F8E9), Color(0xFF8BC34A)),

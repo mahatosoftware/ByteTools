@@ -27,6 +27,8 @@ sealed class Screen(val route: String, val title: String) {
     object Calculator : Screen("calculator", "Calculator")
     object AgeCalculator : Screen("age_calculator", "Age Calculator")
     object DateDuration : Screen("date_duration", "Date Duration")
+    object WorldClock : Screen("world_clock", "World Clock")
+    object PasswordGenerator : Screen("password_generator", "Password Generator")
 
     // Group 5: GPS Utilities Pack
     object GPSDashboard : Screen("gps_dashboard", "GPS Utilities")
